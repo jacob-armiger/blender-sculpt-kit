@@ -74,6 +74,11 @@ def test(sim):
         there = view3d_utils.location_3d_to_region_2d(other, sim.rv3d(right), world)
         return (there - Vector((other.width / 2, other.height / 2)) - Vector(offset)).length
 
+    def level(left, right):
+        """How far apart in height, in window pixels, the two halves draw the point at the middle of the view."""
+        point = sim.rv3d(left).view_location
+        return abs(sim.project(point, left)[1] - sim.project(point, right)[1])
+
     def frame_agrees(left, right):
         frame = module.shared_frame(screen())
         return max(apart(left, right, (frame[0], frame[1])), apart(left, right, (frame[2], frame[3])))
@@ -99,10 +104,19 @@ def test(sim):
     (wl, hl), (wr, hr) = size(left), size(right)
     sim.check("both canvases are the same width, though the sculpt half has a toolbar beside its canvas",
               abs(wl - wr) <= 3 and right.width - left.width > 50, ((wl, hl), (wr, hr), left.width, right.width))
-    sim.check("the reference's canvas is taller: it has no brush shelf under it", hl - hr > 20, (hl, hr))
-    sim.check("what it shows above and below the sculpt's canvas is marked off, half the difference each",
-              strips(left) == [(0, 0, wl, round((hl - hr) / 2)), (0, round(hl - (hl - hr) / 2), wl, hl)]
-              and strips(right) == [], (strips(left), strips(right)))
+    sim.check("and the same height: the reference keeps a brush shelf under it, like the sculpt's",
+              abs(hl - hr) <= 3 and sim.space(left).show_region_asset_shelf, (hl, hr))
+    sim.check("so the two pictures are level across the divider, and nothing needs marking off",
+              level(left, right) <= 2 and strips(left) == [] and strips(right) == [],
+              (level(left, right), strips(left), strips(right)))
+    with sim.override(left):
+        sim.space(left).show_region_asset_shelf = False
+    yield 0.8
+    (wl, hl), (wr, hr) = size(left), size(right)
+    sim.check("without its shelf the reference's canvas is taller, and what it shows above and below the sculpt's "
+              "is marked off, half the difference each", hl - hr > 20
+              and strips(left) == [(0, 0, wl, round((hl - hr) / 2)), (0, round(hl - (hl - hr) / 2), wl, hl)]
+              and strips(right) == [], ((hl, hr), strips(left), strips(right)))
     sim.check("the corners of the frame are the same points in both halves", frame_agrees(left, right) < 1.5,
               round(frame_agrees(left, right), 3))
     yield from sim.key('P', at=sim.at(0.5, 0.5, right))
@@ -124,6 +138,9 @@ def test(sim):
     scene.sculpt_kit_reference_frame = True
     yield from sim.nudge(right)
     sim.check("and on again", brightness(spot) < 0.85 * plain)
+    with sim.override(left):
+        sim.space(left).show_region_asset_shelf = True
+    yield 0.8
     yield from sim.nudge(right)
     sim.screenshot("frame_1_layout.png")
     with sim.override(right):
@@ -146,8 +163,9 @@ def test(sim):
               is_reference(left) and is_sculpt(right) and right.as_pointer() == original
               and sim.space(right).show_region_ui, (state(left), state(right)))
     (wl, hl), (wr, hr) = size(left), size(right)
-    sim.check("both canvases are the same width, though the sculpt half holds the tray",
-              abs(wl - wr) <= 3 and right.width - left.width > 300, ((wl, hl), (wr, hr), left.width, right.width))
+    sim.check("both canvases are the same size, though the sculpt half holds the tray, and the pictures are level",
+              abs(wl - wr) <= 3 and abs(hl - hr) <= 3 and right.width - left.width > 300 and level(left, right) <= 2,
+              ((wl, hl), (wr, hr), left.width, right.width, level(left, right)))
     sim.check("the corners of the frame are the same points in both halves", frame_agrees(left, right) < 1.5,
               round(frame_agrees(left, right), 3))
     yield from sim.nudge(right)
@@ -161,8 +179,7 @@ def test(sim):
     sim.check("closing the tray widens the sculpt's canvas, and the extra at each side is marked off",
               wr - wl > 300 and sides == [(0, 0, round((wr - wl) / 2), hr), (round(wr - (wr - wl) / 2), 0, wr, hr)],
               (wl, wr, strips(right)))
-    sim.check("the reference half keeps only its strips above and below", all(s[0] == 0 and s[2] == wl for s in strips(left)),
-              strips(left))
+    sim.check("the reference half has nothing marked off", strips(left) == [], strips(left))
     sim.check("and the frame still agrees", frame_agrees(left, right) < 1.5, round(frame_agrees(left, right), 3))
     yield from sim.nudge(right)
     sim.screenshot("frame_3_tray_closed.png")
@@ -185,9 +202,8 @@ def test(sim):
     sim.check("the frame stops where the tray and the brush shelf begin",
               abs(frame[2] - (tray.x - canvas.x - wr / 2)) < 1 and abs(frame[1] - (shelf_top - canvas.y - hr / 2)) < 1,
               (frame, tray.x - canvas.x - wr / 2, shelf_top - canvas.y - hr / 2))
-    sim.check("so the reference is marked off where the sculpt is under them",
-              (round(wl / 2 + frame[2]), 0, wl, hl) in strips(left)
-              and any(s[1] == 0 and s[3] == round(hl / 2 + frame[1]) for s in strips(left)), strips(left))
+    sim.check("so the reference is marked off where the sculpt is under the tray",
+              (round(wl / 2 + frame[2]), 0, wl, hl) in strips(left), strips(left))
     sim.check("and the frame still agrees", frame_agrees(left, right) < 1.5, round(frame_agrees(left, right), 3))
     yield from sim.nudge(right)
     sim.screenshot("frame_4_klay.png")
@@ -201,6 +217,11 @@ def test(sim):
     sim.check("opened again in the same layout, in this style: equal halves, reference on the left, sculpt without it",
               is_reference(left) and is_sculpt(right) and abs(size(left)[0] - size(right)[0]) <= 3,
               (size(left), size(right), state(left), state(right)))
+    frame = module.shared_frame(screen())
+    sim.check("the reference has no shelf of its own here, the pictures are level, and it is marked off under the sculpt's shelf",
+              not sim.space(left).show_region_asset_shelf and level(left, right) <= 2
+              and any(s[1] == 0 and s[3] == round(size(left)[1] / 2 + frame[1]) for s in strips(left)),
+              (level(left, right), strips(left)))
     yield from sim.nudge(right)
     sim.screenshot("frame_5_klay_opened.png")
     with sim.override(right):

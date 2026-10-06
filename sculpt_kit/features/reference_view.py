@@ -14,9 +14,12 @@ model is drawn at the same scale in both.
 The halves are also kept to the same frame, so that the edge of the picture
 can be measured against like a pair of calipers: bring the reference up to an
 edge, then sculpt up to the same edge. The view opens with both canvases the
-same width. Wherever one half still shows more than the other (a panel lies
-over part of a canvas, the divider was dragged), the extra is dimmed, and the
-edge of what is left bright is the same place in both.
+same size: the same width, and the same height, for which the reference half
+keeps a brush shelf under it wherever the sculpt's shelf takes room from its
+canvas. The two pictures are then level across the divider as well. Wherever
+one half still shows more than the other (a panel lies over part of a canvas,
+the divider was dragged), the extra is dimmed, and the edge of what is left
+bright is the same place in both.
 
 Versions before 0.3.1 had the halves share a hidden camera with Lock Camera to
 View. That fell out of step as soon as one half left camera view, which is what
@@ -342,8 +345,13 @@ def _open(context, report):
     reference_space.show_gizmo = False
     reference_space.show_region_ui = False
     reference_space.show_region_toolbar = False
+    # Under it, a brush shelf like the sculpt's wherever shelves take room from the canvas: the canvases are
+    # then the same height, so the same point is at the same height on screen in both halves. A view cannot
+    # be slid up or down inside its canvas instead without changing where it looks from. Shelves that float
+    # over the canvas take no room, and there the reference does without one.
+    beside = not context.preferences.system.use_region_overlap
     try:
-        reference_space.show_region_asset_shelf = False
+        reference_space.show_region_asset_shelf = beside and sculpt_area.spaces.active.show_region_asset_shelf
     except AttributeError:
         pass  # read-only outside the modes that have a brush shelf
 

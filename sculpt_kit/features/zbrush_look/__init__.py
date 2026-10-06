@@ -46,6 +46,7 @@ OPTIONS = (
     )),
     ("look_subtools", (
         "Subtools panel in the Sculpt Kit tab: click a mesh to work on it, eye to hide it",
+        "The one you work on stays in view: with its eye off, it hides when you pick another",
         "Duplicate, Merge Down and Delete for the active one",
     )),
     ("look_material", (

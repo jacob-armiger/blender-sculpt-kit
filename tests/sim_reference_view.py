@@ -27,7 +27,7 @@ def test(sim):
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
     with sim.override():
-        bpy.ops.sculptkit.new_sculpt(density='6')
+        bpy.ops.sculptkit.new_sculpt(density='6', frame=True)
     yield 0.8
     sculpt_ob = bpy.context.active_object
     scene = bpy.context.scene

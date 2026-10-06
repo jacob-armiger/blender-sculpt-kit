@@ -229,6 +229,15 @@ def build_brushes():
             b.plane_trim = param(z, 'OuterDepth') - param(z, 'InnerDepth')
         set_preview(b, tines)
 
+    # --- ClayStrips_Rake: Blender's own Clay Strips, untouched, with only the Kingslien rake alpha
+    #     added and set to follow the stroke. For comparing against the tuned ports above.
+    z = load_zbp('Kingslien_Rake')
+    tines = adjusted_alpha(z, 512)
+    b = new_brush('ClayStrips_Rake', base['Clay Strips'],
+                  "Blender's Clay Strips exactly as it ships, with the Kingslien rake alpha. Nothing else changed.")
+    use_alpha_texture(b, make_texture('ClayStrips_Rake_alpha', tines))
+    set_preview(b, tines)
+
     # --- Kingslien_HairTexture: standard brush, tines hardened into strands,
     #     MidValue 0.4 so strands rise and the gaps between them sink.
     z = load_zbp('Kingslien_HairTexture')
@@ -445,13 +454,13 @@ def build(tune):
     bpy.ops.object.mode_set(mode='SCULPT')
     build_brushes()
     for brush in bpy.data.brushes:
-        if brush.name.startswith('Kingslien'):
+        if brush.name.startswith(('Kingslien', 'ClayStrips')):
             tune(brush)
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.data.objects.remove(ob)
     bpy.data.meshes.remove(mesh)
     # entering Sculpt Mode links Blender's own default brush; keep only ours
-    for brush in [b for b in bpy.data.brushes if not b.name.startswith('Kingslien')]:
+    for brush in [b for b in bpy.data.brushes if not b.name.startswith(('Kingslien', 'ClayStrips'))]:
         bpy.data.brushes.remove(brush)
     for lib in list(bpy.data.libraries):
         bpy.data.libraries.remove(lib)

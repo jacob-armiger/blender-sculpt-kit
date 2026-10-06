@@ -63,6 +63,11 @@ if [ "$INTERACTIVE" -eq 1 ]; then
         if [ -f "$OUT/$name.txt" ]; then
             cat "$OUT/$name.txt"
             grep -qE "^(FAIL|ERROR)" "$OUT/$name.txt" && status=1
+            # Errors in code that Blender calls while drawing do not stop a test. They are in its console.
+            if grep -q "^Traceback" "$OUT/$name.console.txt"; then
+                echo "ERROR  $name: Python errors while it ran (see $OUT/$name.console.txt)"
+                status=1
+            fi
         else
             echo "ERROR  $name produced no results (see $OUT/$name.console.txt)"
             status=1

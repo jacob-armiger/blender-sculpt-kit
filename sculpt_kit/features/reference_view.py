@@ -11,13 +11,22 @@ Whatever is done to the view in one half, the other follows. The focal length
 follows the sculpt half, adjusted for the sizes of the two halves so that the
 model is drawn at the same scale in both.
 
+The halves are also kept to the same frame, so that the edge of the picture
+can be measured against like a pair of calipers: bring the reference up to an
+edge, then sculpt up to the same edge. The view opens with both canvases the
+same width. Wherever one half still shows more than the other (a panel lies
+over part of a canvas, the divider was dragged), the extra is dimmed, and the
+edge of what is left bright is the same place in both.
+
 Versions before 0.3.1 had the halves share a hidden camera with Lock Camera to
 View. That fell out of step as soon as one half left camera view, which is what
 switching perspective off does. A file saved with such a view open is tidied
 up the first time the button is pressed in it.
 """
 import bpy
-from bpy.props import PointerProperty
+import gpu
+from bpy.props import BoolProperty, PointerProperty
+from gpu_extras.batch import batch_for_shader
 
 from .. import common
 
@@ -25,10 +34,14 @@ MARK = "sculpt_kit_reference_view"             # on a screen while its reference
 LEGACY_CAMERA = "sculpt_kit_reference_camera"  # on the hidden camera that earlier versions looked through
 REFERENCE_NAMES = ("Reference", "References", "Ref", "reference", "references", "ref")
 TOLERANCE = 1e-5
+SLIVER = 3                      # pixels: a difference between the halves this small is not marked
+DIM = (0.0, 0.0, 0.0, 0.4)      # over what one half shows and the other does not
+EDGE = (1.0, 1.0, 1.0, 0.35)    # the line where that begins
 
 _halves_of = {}  # screen pointer -> (reference area pointer, sculpt area pointer)
 _shown = {}      # screen pointer -> the view both halves were last brought to
 _handle = None
+_frame_handle = None
 
 
 def _view3d_areas(screen):
@@ -147,24 +160,142 @@ def _keep_in_step():
         other.tag_redraw()
 
 
+# ------------------------------------------------------------ the same frame
+
+def _clear(area):
+    """The part of a viewport's canvas that no panel lies over, as (left, bottom, right, top) in pixels
+    from the middle of the canvas, which is where both halves show the same point."""
+    canvas = common.window_region(area)
+    left, bottom, right, top = 0, 0, canvas.width, canvas.height
+    for region in area.regions:
+        if region.type == 'WINDOW' or region.width <= 1 or region.height <= 1:  # hidden ones are a pixel wide
+            continue
+        if (region.x >= canvas.x + canvas.width or region.x + region.width <= canvas.x
+                or region.y >= canvas.y + canvas.height or region.y + region.height <= canvas.y):
+            continue  # beside the canvas, not over it
+        if region.alignment == 'LEFT':
+            left = max(left, region.x + region.width - canvas.x)
+        elif region.alignment == 'RIGHT':
+            right = min(right, region.x - canvas.x)
+        elif region.alignment == 'BOTTOM':
+            bottom = max(bottom, region.y + region.height - canvas.y)
+        elif region.alignment == 'TOP':
+            top = min(top, region.y - canvas.y)
+    x, y = canvas.width / 2, canvas.height / 2
+    return left - x, bottom - y, right - x, top - y
+
+
+def shared_frame(screen):
+    """What both halves show, as (left, bottom, right, top) in pixels from the middle of either canvas. None if closed."""
+    halves = _halves(screen) if screen.get(MARK) else None
+    if halves is None:
+        return None
+    a, b = _clear(halves[0]), _clear(halves[1])
+    return max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
+
+
+def bands(screen, area):
+    """The strips of a half's canvas that the other half does not show, as (x0, y0, x1, y1) in canvas pixels."""
+    frame = shared_frame(screen)
+    if frame is None or area not in _halves(screen) or area.spaces.active.region_3d.view_perspective == 'CAMERA':
+        return []
+    canvas = common.window_region(area)
+    width, height, x, y = canvas.width, canvas.height, canvas.width / 2, canvas.height / 2
+    own = _clear(area)
+    x0 = x + frame[0] if frame[0] - own[0] > SLIVER else 0
+    x1 = x + frame[2] if own[2] - frame[2] > SLIVER else width
+    strips = []
+    if x0 > 0:
+        strips.append((0, 0, x0, height))
+    if x1 < width:
+        strips.append((x1, 0, width, height))
+    if frame[1] - own[1] > SLIVER:
+        strips.append((x0, 0, x1, y + frame[1]))
+    if own[3] - frame[3] > SLIVER:
+        strips.append((x0, y + frame[3], x1, height))
+    return strips
+
+
+def _draw_frame():
+    """Runs over each 3D viewport once it is drawn: dims what this half shows and the other does not."""
+    context = bpy.context
+    screen, area = context.screen, context.area
+    if screen is None or area is None or not screen.get(MARK) or not context.scene.sculpt_kit_reference_frame:
+        return
+    strips = bands(screen, area)
+    if not strips:
+        return
+    canvas = common.window_region(area)
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+    gpu.state.blend_set('ALPHA')
+    shader.uniform_float("color", DIM)
+    corners = [corner for x0, y0, x1, y1 in strips for corner in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
+    faces = [(i, i + 1, i + 2) for i in range(0, len(corners), 4)] + [(i, i + 2, i + 3) for i in range(0, len(corners), 4)]
+    batch_for_shader(shader, 'TRIS', {"pos": corners}, indices=faces).draw(shader)
+    ends = []
+    for x0, y0, x1, y1 in strips:  # along the side of each strip that faces the middle
+        if y0 == 0 and y1 == canvas.height:
+            ends += [(x1, y0), (x1, y1)] if x0 == 0 else [(x0, y0), (x0, y1)]
+        else:
+            ends += [(x0, y1), (x1, y1)] if y0 == 0 else [(x0, y0), (x1, y0)]
+    shader.uniform_float("color", EDGE)
+    batch_for_shader(shader, 'LINES', {"pos": ends}).draw(shader)
+    gpu.state.blend_set('NONE')
+
+
 # ------------------------------------------------------------ opening, closing
 
-def _layer_collection_index(view_layer, collection):
-    """The index `object.hide_collection` expects: depth-first position under the scene collection, from 1."""
-    counter = 0
+def _layer_collections(view_layer):
+    """Every collection of the view layer as (index, layer collection, the one it is inside). The index is the
+    one `object.hide_collection` knows it by: counting from 1, a collection's own children all come before any
+    of their children."""
+    numbered = []
 
-    def walk(layer_collection):
-        nonlocal counter
-        for child in layer_collection.children:
-            counter += 1
-            if child.collection == collection:
-                return counter
-            found = walk(child)
-            if found:
-                return found
-        return 0
+    def walk(parent):
+        children = list(parent.children)
+        for child in children:
+            numbered.append((len(numbered) + 1, child, parent))
+        for child in children:
+            walk(child)
 
-    return walk(view_layer.layer_collection)
+    walk(view_layer.layer_collection)
+    return numbered
+
+
+def _branch(numbered, index):
+    """The indices of a collection, of the ones it is inside and of the ones inside it."""
+    index_of = {layer.as_pointer(): i for i, layer, _parent in numbered}
+    parent_of = {layer.as_pointer(): parent for _i, layer, parent in numbered}
+    target = next(layer for i, layer, _parent in numbered if i == index)
+    branch = {index}
+    parent = parent_of[target.as_pointer()]
+    while parent.as_pointer() in index_of:
+        branch.add(index_of[parent.as_pointer()])
+        parent = parent_of[parent.as_pointer()]
+    inside = [target]
+    while inside:
+        layer = inside.pop()
+        for i, child, parent in numbered:
+            if parent == layer:
+                branch.add(i)
+                inside.append(child)
+    return branch
+
+
+def _show_collections(context, area, numbered, index, alone):
+    """Give a viewport collections of its own: the one at `index` alone, or everything but it.
+
+    Blender offers "show this alone" and "flip this one", and no way to read what a viewport shows. What it
+    starts from can be left over from the last time local collections were on, so nothing is assumed: the
+    collection is shown alone, which hides every other; then, for everything but it, each of those is flipped
+    back on and it is flipped off."""
+    area.spaces.active.use_local_collections = True
+    with context.temp_override(area=area, region=common.window_region(area)):
+        bpy.ops.object.hide_collection(collection_index=index)
+        if not alone:
+            for other in sorted({i for i, _layer, _parent in numbered} - _branch(numbered, index)):
+                bpy.ops.object.hide_collection(collection_index=other, toggle=True)
+            bpy.ops.object.hide_collection(collection_index=index, toggle=True)
 
 
 def _reference_collection(scene, report):
@@ -184,26 +315,26 @@ def _open(context, report):
 
     reference = _reference_collection(scene, report)
     context.view_layer.update()
-    index = _layer_collection_index(context.view_layer, reference)
+    numbered = _layer_collections(context.view_layer)
+    index = next((i for i, layer, _parent in numbered if layer.collection == reference), 0)
     if not index:
         report({'ERROR'}, "The reference collection is not part of this scene")
         return {'CANCELLED'}
 
+    # Split so that both canvases come out the same width: the panels that sit beside the sculpt's canvas
+    # stay with the sculpt half, and the reference half has none.
+    beside = area.width - common.window_region(area).width
+    factor = min(0.5, max(0.2, (area.width - beside) / (2.0 * area.width)))
     before = {a.as_pointer() for a in screen.areas}
     with context.temp_override(area=area, region=common.window_region(area)):
-        bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
-    other = next(a for a in screen.areas if a.as_pointer() not in before)
-    reference_area, sculpt_area = sorted((area, other), key=lambda a: a.x)
+        bpy.ops.screen.area_split(direction='VERTICAL', factor=factor)
+    # Up to a half, Blender puts the new area on the left. Where the areas are cannot be read until the
+    # screen has been drawn again: straight after a split they both still report where they used to be.
+    reference_area = next(a for a in screen.areas if a.as_pointer() not in before)
+    sculpt_area = area
 
-    for view_area, isolate in ((sculpt_area, False), (reference_area, True)):
-        space = view_area.spaces.active
-        space.use_local_collections = False  # so that it starts from what the scene shows
-        space.use_local_collections = True
-        with context.temp_override(area=view_area, region=common.window_region(view_area)):
-            if isolate:
-                bpy.ops.object.hide_collection(collection_index=index)
-            else:
-                bpy.ops.object.hide_collection(collection_index=index, toggle=True)
+    _show_collections(context, sculpt_area, numbered, index, alone=False)
+    _show_collections(context, reference_area, numbered, index, alone=True)
 
     # The reference half is for looking at: nothing drawn over it, no panels down its sides.
     reference_space = reference_area.spaces.active
@@ -307,26 +438,34 @@ class SCULPTKIT_PT_reference_view(bpy.types.Panel):
         sub.prop(context.scene, "sculpt_kit_reference", text="")
         col.operator(SCULPTKIT_OT_reference_view.bl_idname, depress=opened, icon='WINDOW',
                      text="Close Reference View" if opened else "Open Reference View")
+        col.prop(context.scene, "sculpt_kit_reference_frame")
 
 
 _classes = (SCULPTKIT_OT_reference_view, SCULPTKIT_PT_reference_view)
 
 
 def enable():
-    global _handle
+    global _handle, _frame_handle
     bpy.types.Scene.sculpt_kit_reference = PointerProperty(
         type=bpy.types.Collection, name="Reference Collection",
         description="What the reference view shows. Left empty, a collection named Reference is used or created")
+    bpy.types.Scene.sculpt_kit_reference_frame = BoolProperty(
+        name="Matching Edges", default=True, update=lambda _self, _context: common.redraw_all(),
+        description="Dim what one half shows and the other does not. The edge of what stays bright is then the "
+                    "same place in both: bring the reference up to it, then sculpt up to it")
     for cls in _classes:
         bpy.utils.register_class(cls)
     _handle = bpy.types.SpaceView3D.draw_handler_add(_keep_in_step, (), 'WINDOW', 'PRE_VIEW')
+    _frame_handle = bpy.types.SpaceView3D.draw_handler_add(_draw_frame, (), 'WINDOW', 'POST_PIXEL')
 
 
 def disable():
-    global _handle
-    if _handle is not None:
-        bpy.types.SpaceView3D.draw_handler_remove(_handle, 'WINDOW')
-        _handle = None
+    global _handle, _frame_handle
+    for handle in (_handle, _frame_handle):
+        if handle is not None:
+            bpy.types.SpaceView3D.draw_handler_remove(handle, 'WINDOW')
+    _handle = _frame_handle = None
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
+    del bpy.types.Scene.sculpt_kit_reference_frame
     del bpy.types.Scene.sculpt_kit_reference

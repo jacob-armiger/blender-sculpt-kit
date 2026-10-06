@@ -163,6 +163,14 @@ class Sim:
             bpy.ops.screen.screenshot(filepath=path)
         return path
 
+    def nudge(self, area=None):
+        """Move the pointer over a viewport, so that the window is drawn as it now is. Use with `yield from`
+        before a screenshot that gets measured: after a change made by script alone, a window that is behind
+        others can be a change behind."""
+        for fx in (0.5, 0.52):
+            self._send('MOUSEMOVE', 'NOTHING', self.at(fx, 0.5, area), {})
+            yield 0.25
+
 
 def run(name, test):
     """Run test(sim) as a generator driven by a timer, then save the results and quit Blender."""

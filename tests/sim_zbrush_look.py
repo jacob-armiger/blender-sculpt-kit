@@ -72,7 +72,7 @@ def test(sim):
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
     with sim.override():
-        bpy.ops.sculptkit.new_sculpt(density='6')
+        bpy.ops.sculptkit.new_sculpt(density='6', frame=True)
     yield 1.0
     sim.check("the brush bar is the ZBrush shelf", look.shelf.in_place())
     sim.check("the viewport header has the view switches and the material picker",
@@ -128,7 +128,7 @@ def test(sim):
         return bpy.context.active_object.name, bpy.context.mode
 
     first = bpy.context.active_object.name
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6', radius=0.5)
+    sim.call(bpy.ops.sculptkit.new_sculpt, density='6', radius=0.5, location=(0.0, 0.0, 0.0))
     yield 0.8
     second = bpy.context.active_object.name
     sim.check("a second sculpt joins the subtool list", meshes() == sorted([first, second]), meshes())
@@ -136,10 +136,6 @@ def test(sim):
     yield 0.5
     sim.check("clicking a subtool moves Sculpt Mode over to it", result == {'FINISHED'}
               and active() == (first, 'SCULPT') and bpy.data.objects[second].mode == 'OBJECT', active())
-    # The view is still close in on the small sphere, where the brush is smaller than this coarse mesh's faces.
-    with sim.override():
-        bpy.ops.view3d.view_all()
-    yield 0.6
     before = sim.positions()
     centre = sim.project((0.0, 0.0, 0.0))
     yield from sim.drag(centre, (centre[0] + 60, centre[1] + 10))
@@ -154,14 +150,55 @@ def test(sim):
     sim.call(bpy.ops.sculptkit.subtool_select, name=first)
     yield 0.5
 
+    def visible(name):
+        return bpy.data.objects[name].visible_get()
+
+    def eye_off(name):
+        return look.subtools.eye_off(bpy.data.objects[name], bpy.context.view_layer.objects.active)
+
     sim.call(bpy.ops.sculptkit.subtool_show, name=second)
     yield 0.3
-    sim.check("the eye hides another subtool", not bpy.data.objects[second].visible_get())
-    hidden_self = sim.call(bpy.ops.sculptkit.subtool_show, name=first)
-    sim.check("but not the one being sculpted", hidden_self == {'CANCELLED'} and bpy.data.objects[first].visible_get())
+    sim.check("the eye hides another subtool", not visible(second) and eye_off(second))
     sim.call(bpy.ops.sculptkit.subtool_show, name=second)
     yield 0.3
-    sim.check("and shows it again", bpy.data.objects[second].visible_get())
+    sim.check("and shows it again", visible(second) and not eye_off(second))
+
+    # The eye of the subtool being sculpted works as in ZBrush: it stays in view until another takes over.
+    result = sim.call(bpy.ops.sculptkit.subtool_show, name=first)
+    yield 0.3
+    sim.check("the eye of the subtool being sculpted switches off, and it stays in view", result == {'FINISHED'}
+              and visible(first) and eye_off(first) and active() == (first, 'SCULPT'), (visible(first), eye_off(first)))
+    sim.call(bpy.ops.sculptkit.subtool_select, name=second)
+    yield 0.5
+    sim.check("it hides once another subtool is picked", not visible(first) and active() == (second, 'SCULPT'),
+              (visible(first), active()))
+    sim.call(bpy.ops.sculptkit.subtool_select, name=first)
+    yield 0.5
+    sim.check("picked again it is back in view, its eye still off", visible(first) and eye_off(first)
+              and active() == (first, 'SCULPT'), (visible(first), eye_off(first), active()))
+    yield from sim.undo()
+    sim.check("undo goes back to the other one, with this one hidden again", not visible(first)
+              and active() == (second, 'SCULPT'), (visible(first), active()))
+    sim.call(bpy.ops.sculptkit.subtool_select, name=first)
+    yield 0.5
+    sim.call(bpy.ops.sculptkit.subtool_show, name=first)
+    yield 0.3
+    sim.check("its eye switches back on", visible(first) and not eye_off(first))
+    sim.call(bpy.ops.sculptkit.subtool_select, name=second)
+    yield 0.5
+    sim.check("and then it stays in view when another is picked", visible(first) and visible(second)
+              and active() == (second, 'SCULPT'), (visible(first), visible(second), active()))
+
+    # Blender's own way of moving on to another mesh: Alt + Q with the pointer over it.
+    sim.call(bpy.ops.sculptkit.subtool_show, name=second)
+    yield 0.3
+    yield from sim.key('Q', at=sim.project((0.0, 0.0, 0.0)), alt=True)
+    yield 0.8
+    sim.check("Blender's Transfer Mode counts as picking another too", active() == (first, 'SCULPT')
+              and not visible(second) and not eye_off(first), (active(), visible(second)))
+    sim.call(bpy.ops.sculptkit.subtool_show, name=second)
+    yield 0.3
+    sim.check("and the eye brings the hidden one back", visible(second) and active() == (first, 'SCULPT'))
 
     sim.call(bpy.ops.sculptkit.subtool_duplicate)
     yield 0.5

@@ -375,7 +375,11 @@ for name, teeth in (("SculptKit_Rake", 5), ("SculptKit_Rake_Fine", 10)):
 with bpy.data.libraries.load(os.path.join(kingslien_library, "Kingslien_Brushes.blend"), assets_only=True) as (src, dst):
     dst.brushes = list(src.brushes)
 names = sorted(b.name for b in dst.brushes)
-check("six Kingslien brushes bundled", len(names) == 6, names)
+check("six Kingslien brushes bundled, and the plain Clay Strips rake", len(names) == 7 and "ClayStrips_Rake" in names, names)
+plain = next(b for b in dst.brushes if b.name == "ClayStrips_Rake")
+check("the plain Clay Strips rake changes nothing but the alpha", plain.sculpt_brush_type == 'CLAY_STRIPS'
+      and plain.texture is not None and plain.texture_slot.use_rake and plain.curve_distance_falloff_preset != 'CUSTOM',
+      plain.curve_distance_falloff_preset)
 clay = next(b for b in dst.brushes if b.name == "Kingslien_Clay")
 size_curve = [tuple(round(v, 3) for v in p.location) for p in clay.curve_size.curves[0].points]
 check("Clay keeps a quarter of its size at the lightest pressure", clay.use_pressure_size and size_curve[0] == (0.0, 0.25),
@@ -403,13 +407,31 @@ prefs.use_remesh = True
 check("remesh tools back on", registered("SCULPTKIT_OT_quad_remesh") and REMESH_KEY in all_kit_keys())
 
 # ---- new sculpt sphere
+on_screen = [o for o in bpy.context.view_layer.objects if o.type == 'MESH' and o.visible_get()]
 bpy.ops.sculptkit.new_sculpt(density='6')
 ob = bpy.context.active_object
+check("Blender's starting cube is hidden to make room for the first sphere", [o.name for o in on_screen] == ["Cube"]
+      and not on_screen[0].visible_get() and tuple(ob.location) == (0.0, 0.0, 0.0), [o.name for o in on_screen])
 radii = [v.co.length for v in ob.data.vertices]
 check("new sculpt makes a 25k quad sphere", ob.name.startswith("Sculpt") and len(ob.data.polygons) == 6 * 4 ** 6
       and all(len(p.vertices) == 4 for p in ob.data.polygons), len(ob.data.polygons))
-check("sphere radius is 1", abs(min(radii) - 1.0) < 1e-4 and abs(max(radii) - 1.0) < 1e-4, (min(radii), max(radii)))
+check("it is the size of that cube: radius 1", abs(min(radii) - 1.0) < 1e-4 and abs(max(radii) - 1.0) < 1e-4,
+      (min(radii), max(radii)))
 check("new sculpt enters Sculpt Mode", bpy.context.mode == 'SCULPT', bpy.context.mode)
+bpy.ops.sculptkit.new_sculpt(density='6')
+part = bpy.context.active_object
+check("one added to a sculpt is the same size", part != ob and bpy.context.mode == 'SCULPT' and ob.visible_get()
+      and all(abs(d - 2.0) < 1e-3 for d in part.dimensions), tuple(part.dimensions))
+bpy.ops.sculptkit.new_sculpt(density='6', radius=0.7, location=(3.0, 0.0, 0.0))
+given = bpy.context.active_object
+check("a radius and a location that are given are kept", all(abs(d - 1.4) < 1e-3 for d in given.dimensions)
+      and tuple(given.location) == (3.0, 0.0, 0.0), (tuple(given.dimensions), tuple(given.location)))
+bpy.ops.object.mode_set(mode='OBJECT')
+for extra in (part, given):
+    bpy.data.objects.remove(extra)
+ob.select_set(True)
+bpy.context.view_layer.objects.active = ob
+bpy.ops.object.mode_set(mode='SCULPT')
 
 # ---- divide
 bpy.ops.sculptkit.divide()

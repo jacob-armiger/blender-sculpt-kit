@@ -3,13 +3,20 @@
 Click a name to work on that mesh: the mode you are in moves over to it, so in
 Sculpt Mode you carry on sculpting. The eye hides or shows a mesh. Duplicate,
 Merge Down and Delete act on the active one.
+
+As in ZBrush, the mesh being worked on is always in view. Its eye can still be
+switched off: the mesh then goes into hiding as soon as another takes over, and
+comes back, eye still off, for as long as it is picked again.
 """
 from contextlib import contextmanager
 
 import bpy
+from bpy.app.handlers import persistent
 from bpy.props import BoolProperty, StringProperty
 
 from ... import common
+
+EYE_OFF = "sculpt_kit_eye_off"  # on the mesh being worked on while its eye is off
 
 
 def subtools(context):
@@ -55,6 +62,32 @@ def _make_active(context, ob):
     context.view_layer.objects.active = ob
 
 
+def eye_off(ob, current):
+    """Whether the list shows this mesh's eye as off."""
+    return not ob.visible_get() or (ob == current and bool(ob.get(EYE_OFF)))
+
+
+def settle(view_layer):
+    """Hide the meshes whose eye was switched off while they were worked on, now that another has taken over."""
+    current = view_layer.objects.active
+    for ob in view_layer.objects:
+        if ob != current and ob.get(EYE_OFF):
+            del ob[EYE_OFF]
+            ob.hide_set(True, view_layer=view_layer)
+
+
+def _work_on(context, ob):
+    """Make this mesh the one being worked on, which brings it into view. False if it cannot be shown."""
+    off = not ob.visible_get()
+    if not _show(ob):
+        return False
+    _make_active(context, ob)
+    if off:
+        ob[EYE_OFF] = True
+    settle(context.view_layer)
+    return True
+
+
 class SCULPTKIT_OT_subtool_select(bpy.types.Operator):
     """Work on this mesh. The mode you are in moves over to it"""
     bl_idname = "sculptkit.subtool_select"
@@ -71,12 +104,11 @@ class SCULPTKIT_OT_subtool_select(bpy.types.Operator):
         mode = current.mode if current is not None else 'OBJECT'
         if mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
-        if not _show(ob):
+        if not _work_on(context, ob):
             if mode != 'OBJECT':
                 _enter(mode)
             self.report({'WARNING'}, "%s is in a hidden collection" % ob.name)
             return {'CANCELLED'}
-        _make_active(context, ob)
         if mode != 'OBJECT':
             _enter(mode)
         return {'FINISHED'}
@@ -84,7 +116,7 @@ class SCULPTKIT_OT_subtool_select(bpy.types.Operator):
 
 class SCULPTKIT_OT_subtool_show(bpy.types.Operator):
     """Hide or show this mesh. Shift + click hides or shows all the others instead.
-The mesh you are working on always stays visible"""
+The mesh you are working on stays in view: with its eye off, it hides when you pick another"""
     bl_idname = "sculptkit.subtool_show"
     bl_label = "Hide or Show Subtool"
     bl_options = {'UNDO'}
@@ -110,12 +142,15 @@ The mesh you are working on always stays visible"""
                 else:
                     _show(other)
             return {'FINISHED'}
-        if ob.visible_get():
-            if ob == current:
-                return {'CANCELLED'}
+        if not ob.visible_get():
+            if not _show(ob):
+                self.report({'WARNING'}, "%s is in a hidden collection" % ob.name)
+            ob.pop(EYE_OFF, None)
+        elif ob != current:
+            ob.pop(EYE_OFF, None)
             ob.hide_set(True)
-        elif not _show(ob):
-            self.report({'WARNING'}, "%s is in a hidden collection" % ob.name)
+        elif ob.pop(EYE_OFF, None) is None:
+            ob[EYE_OFF] = True
         return {'FINISHED'}
 
 
@@ -137,6 +172,7 @@ class SCULPTKIT_OT_subtool_duplicate(_ActiveSubtool, bpy.types.Operator):
         with _object_mode(context):
             copy = ob.copy()
             copy.data = ob.data.copy()
+            copy.pop(EYE_OFF, None)
             for collection in ob.users_collection:
                 collection.objects.link(copy)
         return {'FINISHED'}
@@ -191,8 +227,7 @@ class SCULPTKIT_OT_subtool_delete(_ActiveSubtool, bpy.types.Operator):
         bpy.data.objects.remove(ob)
         if mesh.users == 0:
             bpy.data.meshes.remove(mesh)
-        if successor is not None and _show(successor):
-            _make_active(context, successor)
+        if successor is not None and _work_on(context, successor):
             if mode != 'OBJECT':
                 _enter(mode)
         return {'FINISHED'}
@@ -217,7 +252,7 @@ class SCULPTKIT_PT_subtools(bpy.types.Panel):
             row = col.row(align=True)
             row.operator(SCULPTKIT_OT_subtool_select.bl_idname, text=ob.name, depress=ob == current).name = ob.name
             row.operator(SCULPTKIT_OT_subtool_show.bl_idname, text="",
-                         icon='HIDE_OFF' if ob.visible_get() else 'HIDE_ON').name = ob.name
+                         icon='HIDE_ON' if eye_off(ob, current) else 'HIDE_OFF').name = ob.name
         if current is not None and current.type == 'MESH':
             col = layout.column(align=True)
             col.prop(current, "name", text="")
@@ -231,11 +266,39 @@ _classes = (SCULPTKIT_OT_subtool_select, SCULPTKIT_OT_subtool_show, SCULPTKIT_OT
             SCULPTKIT_OT_subtool_merge_down, SCULPTKIT_OT_subtool_delete, SCULPTKIT_PT_subtools)
 
 
+# Blender has ways of its own to move on to another mesh: a click in Object Mode, Transfer Mode, the Outliner.
+# None of them tells add-ons, so the result is looked for after each change to the scene.
+_seen = {}  # view layer -> the active object when its meshes were last looked over
+
+
+def _settle_all():
+    for window in bpy.context.window_manager.windows:
+        settle(window.view_layer)
+    common.redraw_all()
+
+
+@persistent
+def _watch(_scene, depsgraph):
+    if depsgraph.mode != 'VIEWPORT':
+        return
+    view_layer = depsgraph.view_layer
+    current = view_layer.objects.active
+    now = current.as_pointer() if current is not None else 0
+    if _seen.get(view_layer.as_pointer()) == now:
+        return
+    _seen[view_layer.as_pointer()] = now
+    if any(ob != current and ob.get(EYE_OFF) for ob in view_layer.objects):
+        bpy.app.timers.register(_settle_all, first_interval=0.0)  # not from in here: Blender is in mid-update
+
+
 def enable(by_user=False):
     for cls in _classes:
         bpy.utils.register_class(cls)
+    bpy.app.handlers.depsgraph_update_post.append(_watch)
 
 
 def disable(restore=True):
+    bpy.app.handlers.depsgraph_update_post.remove(_watch)
+    _seen.clear()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)

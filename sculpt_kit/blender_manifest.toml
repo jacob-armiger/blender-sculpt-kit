@@ -1,0 +1,18 @@
+schema_version = "1.0.0"
+
+id = "sculpt_kit"
+version = "0.3.1"
+name = "Sculpt Kit"
+tagline = "ZBrush-style sculpting setup with one switch per feature"
+maintainer = "Jacob Armiger"
+type = "add-on"
+
+blender_version_min = "5.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+clipboard = "Copy the active brush's settings for tuning"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", ".DS_Store", "*.blend1"]

@@ -1,0 +1,5 @@
+# Asset catalogs for the Kingslien brush port.
+
+VERSION 1
+
+6b1f4f0e-6a55-4b6e-9d0c-4b2a8f3c7e11:Kingslien:Kingslien

@@ -1,0 +1,77 @@
+# Sculpt Kit
+
+A Blender extension that makes sculpting in Blender feel like ZBrush. Every feature has its own switch.
+
+Requires **Blender 5.2 or newer**. It is a personal kit: the Kingslien brushes use alphas taken from a purchased ZBrush brush set, so do not share the zip.
+
+## Install on another Blender or another computer
+
+Everything the kit needs (code, brushes, alphas, colour themes, the grey material) is inside one file: the newest `dist/sculpt_kit-<version>.zip`.
+
+1. Copy that zip to the other machine.
+2. Either drag the zip onto the Blender window and confirm, or use Preferences > Get Extensions > the arrow menu at the top right > Install from Disk.
+3. Make sure it is ticked under Preferences > Add-ons > Sculpt Kit.
+
+Your switches and choices (style, material, which features are on) are stored in each Blender's own preferences, so they do not travel with the zip. A fresh install starts with everything on, in the ZBrush style.
+
+To update, install a newer zip the same way. To remove it, untick or uninstall it in Preferences; that puts your own theme back.
+
+## What is in it
+
+All switches are in Preferences > Add-ons > Sculpt Kit.
+
+| Feature | What it does |
+|---|---|
+| ZBrush navigation and keys | Sculpt Mode only: right-drag and empty-canvas navigation, Alt inverts, Ctrl masks, ZBrush hotkeys (S size, U strength, F frame, X symmetry, B brushes, D / Shift+D / Ctrl+D subdivision) |
+| ZBrush look | Colour theme (ZBrush or KlaySculpt style), ZBrush Layout button in the top bar, ZBrush-style brush bar and view switches, Subtools list, material (red wax, grey, brown clay). Each part has its own switch |
+| Move and rake brushes | Move that grabs through the whole model; Rake (5 teeth) and Fine Rake (10 teeth, needs a dense mesh) |
+| Kingslien brushes | Clay, Rake, Rake V2, HairTexture, Knife, KnifeSoft, ported from Ryan Kingslien's ZBrush brushes |
+| Synced reference view | Splits the viewport: reference on the left, sculpt on the right, both kept on the same view |
+| New sculpt sphere | Dense quad sphere at 25 thousand to 1.5 million faces, in Sculpt Mode, viewport set up |
+| Remesh tools | Voxel Remesh by resolution on Ctrl+R; Quad Remesh that repairs the mesh first |
+| Brush tuning helper | Copy Tuning button that copies the active brush's settings |
+
+The panels are in the 3D viewport sidebar (N), in the Sculpt Kit tab. The brushes are in the Sculpt Mode brush shelf.
+
+## Working on the kit
+
+Run these from the project folder. They use `/Applications/Blender.app`; set `BLENDER` to use another.
+
+```bash
+tools/build.sh
+```
+
+Builds the brush libraries, colour themes and grey material, and writes the zip to `dist/`.
+
+```bash
+tests/run.sh
+```
+
+Runs every check in a throwaway Blender profile (`.test-profile`), so your own preferences are never touched. Blender windows open and close by themselves while it runs. `tests/run.sh --headless` skips those; `tests/run.sh sim_reference_view` runs one interactive test.
+
+```bash
+tools/install.sh
+```
+
+Installs the newest zip into this machine's Blender. Blender must be closed.
+
+Bump `version` in `sculpt_kit/blender_manifest.toml` before building a new release.
+
+## Where things are
+
+| Path | Contents |
+|---|---|
+| `sculpt_kit/` | The extension itself. `features/` has one module per feature |
+| `sculpt_kit/assets/` | Built brush libraries and the grey matcap (generated; do not edit by hand) |
+| `tools/` | Build scripts: `build_assets.py` (kit brushes), `kingslien.py` (ZBrush brush port), `build_theme.py` (colour styles), `build_matcap.py` (grey material) |
+| `brush_sources/kingslien/` | The original ZBrush `.ZBP` brush files |
+| `tuning/brushes.toml` | Brush setting overrides from pen testing |
+| `tests/` | Headless checks and simulated-input tests |
+| `dist/` | Built zips |
+
+## Tuning
+
+- **A brush:** adjust it in Blender, press Copy Tuning in the Sculpt Kit tab, paste the block into `tuning/brushes.toml`, then build and install.
+- **Colours:** edit the `STYLES` table in `tools/build_theme.py`.
+- **Grey material:** edit the numbers at the top of `tools/build_matcap.py`.
+- **Rake teeth:** edit `RAKES` in `tools/build_assets.py`.

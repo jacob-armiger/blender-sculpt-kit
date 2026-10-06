@@ -1,0 +1,3663 @@
+{
+ "styles": {
+  "ZBRUSH": {
+   "system.use_region_overlap": false,
+   "themes[0].clip_editor.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].clip_editor.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].clip_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].clip_editor.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].console.cursor": [
+    1.0,
+    0.6,
+    0.24
+   ],
+   "themes[0].console.space.back": [
+    0.0853,
+    0.0853,
+    0.0853
+   ],
+   "themes[0].console.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].console.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].console.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].console.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].dopesheet_editor.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].dopesheet_editor.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].dopesheet_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].dopesheet_editor.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].file_browser.selected_file": [
+    0.62,
+    0.29,
+    0.0
+   ],
+   "themes[0].file_browser.space.back": [
+    0.1176,
+    0.1176,
+    0.1176
+   ],
+   "themes[0].file_browser.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].file_browser.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].file_browser.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].graph_editor.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].graph_editor.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].graph_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].image_editor.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].image_editor.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].image_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].image_editor.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].image_editor.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].info.info_selected": [
+    0.62,
+    0.29,
+    0.0
+   ],
+   "themes[0].info.space.back": [
+    0.0853,
+    0.0853,
+    0.0853
+   ],
+   "themes[0].info.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].info.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].nla_editor.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].nla_editor.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].nla_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].node_editor.space.back": [
+    0.0765,
+    0.0765,
+    0.0765
+   ],
+   "themes[0].node_editor.space.header": [
+    0.0765,
+    0.0765,
+    0.0765,
+    0.702
+   ],
+   "themes[0].node_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].node_editor.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].node_editor.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].outliner.active": [
+    0.62,
+    0.29,
+    0.0
+   ],
+   "themes[0].outliner.selected_highlight": [
+    0.3,
+    0.16,
+    0.04
+   ],
+   "themes[0].outliner.space.back": [
+    0.1176,
+    0.1176,
+    0.1176
+   ],
+   "themes[0].outliner.space.header": [
+    0.1176,
+    0.1176,
+    0.1176,
+    0.702
+   ],
+   "themes[0].outliner.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].preferences.match": [
+    0.62,
+    0.29,
+    0.0
+   ],
+   "themes[0].preferences.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].preferences.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].preferences.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].preferences.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].preferences.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].properties.match": [
+    0.62,
+    0.29,
+    0.0
+   ],
+   "themes[0].properties.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].properties.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].properties.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].properties.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].properties.space.title": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].regions.asset_shelf.back": [
+    0.141,
+    0.141,
+    0.141,
+    1.0
+   ],
+   "themes[0].regions.asset_shelf.header_back": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].regions.channels.back": [
+    0.0853,
+    0.0853,
+    0.0853
+   ],
+   "themes[0].regions.scrubbing.back": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].regions.scrubbing.text": [
+    0.3765,
+    0.3765,
+    0.3765
+   ],
+   "themes[0].regions.sidebars.back": [
+    0.141,
+    0.141,
+    0.141,
+    1.0
+   ],
+   "themes[0].regions.sidebars.tab_back": [
+    0.102,
+    0.102,
+    0.102,
+    1.0
+   ],
+   "themes[0].sequence_editor.space.back": [
+    0.0706,
+    0.0706,
+    0.0706
+   ],
+   "themes[0].sequence_editor.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].sequence_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].sequence_editor.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].spreadsheet.space.back": [
+    0.1176,
+    0.1176,
+    0.1176
+   ],
+   "themes[0].spreadsheet.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].spreadsheet.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].statusbar.space.back": [
+    0.1412,
+    0.1412,
+    0.1412
+   ],
+   "themes[0].statusbar.space.header": [
+    0.0706,
+    0.0706,
+    0.0706,
+    0.702
+   ],
+   "themes[0].text_editor.cursor": [
+    1.0,
+    0.6,
+    0.24
+   ],
+   "themes[0].text_editor.line_numbers_background": [
+    0.0853,
+    0.0853,
+    0.0853
+   ],
+   "themes[0].text_editor.space.back": [
+    0.1029,
+    0.1029,
+    0.1029
+   ],
+   "themes[0].text_editor.space.header": [
+    0.1412,
+    0.1412,
+    0.1412,
+    0.702
+   ],
+   "themes[0].text_editor.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].text_editor.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].text_editor.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].topbar.space.back": [
+    0.0706,
+    0.0706,
+    0.0706
+   ],
+   "themes[0].topbar.space.header": [
+    0.0706,
+    0.0706,
+    0.0706,
+    0.702
+   ],
+   "themes[0].topbar.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].topbar.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.editor_border": [
+    0.0647,
+    0.0647,
+    0.0647
+   ],
+   "themes[0].user_interface.link": [
+    1.0,
+    0.6,
+    0.24,
+    1.0
+   ],
+   "themes[0].user_interface.panel_active": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.panel_back": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.panel_header": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.panel_roundness": 0.2,
+   "themes[0].user_interface.panel_text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.panel_title": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_box.inner": [
+    0.0853,
+    0.0853,
+    0.0853,
+    0.502
+   ],
+   "themes[0].user_interface.wcol_box.inner_sel": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.item": [
+    0.0735,
+    0.0735,
+    0.0735,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.outline": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.outline_sel": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.roundness": 0.2,
+   "themes[0].user_interface.wcol_box.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_curve.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_curve.outline": [
+    0.3353,
+    0.3353,
+    0.3353,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_curve.roundness": 0.2,
+   "themes[0].user_interface.wcol_list_item.inner_sel": [
+    0.62,
+    0.29,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_list_item.outline": [
+    0.1324,
+    0.1324,
+    0.1324,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_list_item.outline_sel": [
+    0.1324,
+    0.1324,
+    0.1324,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_list_item.roundness": 0.2,
+   "themes[0].user_interface.wcol_menu.inner": [
+    0.1176,
+    0.1176,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    0.702
+   ],
+   "themes[0].user_interface.wcol_menu.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu.roundness": 0.2,
+   "themes[0].user_interface.wcol_menu.shadedown": -5,
+   "themes[0].user_interface.wcol_menu.shadetop": 5,
+   "themes[0].user_interface.wcol_menu.show_shaded": true,
+   "themes[0].user_interface.wcol_menu.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_menu.text_sel": [
+    0.06,
+    0.06,
+    0.06
+   ],
+   "themes[0].user_interface.wcol_menu_back.inner": [
+    0.0706,
+    0.0706,
+    0.0706,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.outline": [
+    0.1059,
+    0.1059,
+    0.1059,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.outline_sel": [
+    0.1059,
+    0.1059,
+    0.1059,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.roundness": 0.2,
+   "themes[0].user_interface.wcol_menu_item.inner": [
+    0.0706,
+    0.0706,
+    0.0706,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.outline": [
+    0.1794,
+    0.1794,
+    0.1794,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.outline_sel": [
+    0.1794,
+    0.1794,
+    0.1794,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.roundness": 0.2,
+   "themes[0].user_interface.wcol_menu_item.text": [
+    0.7887,
+    0.7887,
+    0.7887
+   ],
+   "themes[0].user_interface.wcol_menu_item.text_sel": [
+    0.06,
+    0.06,
+    0.06
+   ],
+   "themes[0].user_interface.wcol_num.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.inner_sel": [
+    0.1,
+    0.1,
+    0.1,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.item": [
+    0.62,
+    0.29,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.roundness": 0.2,
+   "themes[0].user_interface.wcol_num.shadedown": -5,
+   "themes[0].user_interface.wcol_num.shadetop": 5,
+   "themes[0].user_interface.wcol_num.show_shaded": true,
+   "themes[0].user_interface.wcol_num.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_numslider.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.inner_sel": [
+    0.1,
+    0.1,
+    0.1,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.item": [
+    0.62,
+    0.29,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.roundness": 0.2,
+   "themes[0].user_interface.wcol_numslider.shadedown": -5,
+   "themes[0].user_interface.wcol_numslider.shadetop": 5,
+   "themes[0].user_interface.wcol_numslider.show_shaded": true,
+   "themes[0].user_interface.wcol_numslider.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_option.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.item": [
+    0.06,
+    0.06,
+    0.06,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.roundness": 0.2,
+   "themes[0].user_interface.wcol_option.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_pie_menu.inner": [
+    0.0706,
+    0.0706,
+    0.0706,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.item": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.outline": [
+    0.1059,
+    0.1059,
+    0.1059,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.outline_sel": [
+    0.1059,
+    0.1059,
+    0.1059,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.roundness": 0.2,
+   "themes[0].user_interface.wcol_pie_menu.text": [
+    0.7744,
+    0.7744,
+    0.7744
+   ],
+   "themes[0].user_interface.wcol_pie_menu.text_sel": [
+    0.06,
+    0.06,
+    0.06
+   ],
+   "themes[0].user_interface.wcol_progress.inner": [
+    0.1,
+    0.1,
+    0.1,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.item": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.outline": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.outline_sel": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.roundness": 0.2,
+   "themes[0].user_interface.wcol_progress.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_pulldown.inner": [
+    0.1,
+    0.1,
+    0.1,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_pulldown.outline": [
+    0.1794,
+    0.1794,
+    0.1794,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_pulldown.outline_sel": [
+    0.1794,
+    0.1794,
+    0.1794,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_pulldown.roundness": 0.2,
+   "themes[0].user_interface.wcol_pulldown.text": [
+    0.7744,
+    0.7744,
+    0.7744
+   ],
+   "themes[0].user_interface.wcol_radio.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.item": [
+    0.1088,
+    0.1088,
+    0.1088,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.roundness": 0.2,
+   "themes[0].user_interface.wcol_radio.shadedown": -5,
+   "themes[0].user_interface.wcol_radio.shadetop": 5,
+   "themes[0].user_interface.wcol_radio.show_shaded": true,
+   "themes[0].user_interface.wcol_radio.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_radio.text_sel": [
+    0.06,
+    0.06,
+    0.06
+   ],
+   "themes[0].user_interface.wcol_regular.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.item": [
+    0.0853,
+    0.0853,
+    0.0853,
+    0.502
+   ],
+   "themes[0].user_interface.wcol_regular.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.roundness": 0.2,
+   "themes[0].user_interface.wcol_regular.shadedown": -5,
+   "themes[0].user_interface.wcol_regular.shadetop": 5,
+   "themes[0].user_interface.wcol_regular.show_shaded": true,
+   "themes[0].user_interface.wcol_regular.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_scroll.inner": [
+    0.1,
+    0.1,
+    0.1,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_scroll.item": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_scroll.outline": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_scroll.outline_sel": [
+    0.1794,
+    0.1794,
+    0.1794,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_scroll.roundness": 0.2,
+   "themes[0].user_interface.wcol_scroll.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_tab.inner": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.inner_sel": [
+    0.1412,
+    0.1412,
+    0.1412,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.item": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.outline": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.outline_sel": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.roundness": 0.2,
+   "themes[0].user_interface.wcol_text.inner": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.inner_sel": [
+    0.0706,
+    0.0706,
+    0.0706,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.roundness": 0.2,
+   "themes[0].user_interface.wcol_text.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_toggle.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.item": [
+    0.1088,
+    0.1088,
+    0.1088,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.roundness": 0.2,
+   "themes[0].user_interface.wcol_toggle.shadedown": -5,
+   "themes[0].user_interface.wcol_toggle.shadetop": 5,
+   "themes[0].user_interface.wcol_toggle.show_shaded": true,
+   "themes[0].user_interface.wcol_toggle.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_toggle.text_sel": [
+    0.06,
+    0.06,
+    0.06
+   ],
+   "themes[0].user_interface.wcol_tool.inner": [
+    0.2471,
+    0.2471,
+    0.2471,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.roundness": 0.2,
+   "themes[0].user_interface.wcol_tool.shadedown": -5,
+   "themes[0].user_interface.wcol_tool.shadetop": 5,
+   "themes[0].user_interface.wcol_tool.show_shaded": true,
+   "themes[0].user_interface.wcol_tool.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_tool.text_sel": [
+    0.06,
+    0.06,
+    0.06
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.inner": [
+    0.1176,
+    0.1176,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.outline": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.outline_sel": [
+    0.086,
+    0.086,
+    0.086,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.roundness": 0.2,
+   "themes[0].user_interface.wcol_toolbar_item.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.text_sel": [
+    0.06,
+    0.06,
+    0.06
+   ],
+   "themes[0].user_interface.wcol_tooltip.inner": [
+    0.0853,
+    0.0853,
+    0.0853,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.inner_sel": [
+    0.941,
+    0.439,
+    0.0,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.outline": [
+    0.1059,
+    0.1059,
+    0.1059,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.outline_sel": [
+    0.1059,
+    0.1059,
+    0.1059,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.roundness": 0.2,
+   "themes[0].user_interface.wcol_tooltip.text": [
+    0.7744,
+    0.7744,
+    0.7744
+   ],
+   "themes[0].user_interface.widget_text_cursor": [
+    1.0,
+    0.6,
+    0.24
+   ],
+   "themes[0].view_3d.space.gradients.background_type": "LINEAR",
+   "themes[0].view_3d.space.gradients.gradient": [
+    0.29,
+    0.29,
+    0.29
+   ],
+   "themes[0].view_3d.space.gradients.high_gradient": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "themes[0].view_3d.space.header": [
+    0.141,
+    0.141,
+    0.141,
+    1.0
+   ],
+   "themes[0].view_3d.space.header_text": [
+    0.8493,
+    0.8493,
+    0.8493
+   ],
+   "themes[0].view_3d.space.text": [
+    0.8208,
+    0.8208,
+    0.8208
+   ],
+   "themes[0].view_3d.space.title": [
+    0.8493,
+    0.8493,
+    0.8493
+   ]
+  },
+  "KLAY": {
+   "themes[0].clip_editor.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].clip_editor.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].clip_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].clip_editor.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].console.cursor": [
+    0.886,
+    0.655,
+    0.608
+   ],
+   "themes[0].console.space.back": [
+    0.1137,
+    0.1137,
+    0.1297
+   ],
+   "themes[0].console.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].console.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].console.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].console.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].dopesheet_editor.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].dopesheet_editor.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].dopesheet_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].dopesheet_editor.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].file_browser.selected_file": [
+    0.455,
+    0.361,
+    0.345
+   ],
+   "themes[0].file_browser.space.back": [
+    0.1569,
+    0.1569,
+    0.1729
+   ],
+   "themes[0].file_browser.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].file_browser.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].file_browser.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].graph_editor.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].graph_editor.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].graph_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].image_editor.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].image_editor.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].image_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].image_editor.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].image_editor.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].info.info_selected": [
+    0.455,
+    0.361,
+    0.345
+   ],
+   "themes[0].info.space.back": [
+    0.1137,
+    0.1137,
+    0.1297
+   ],
+   "themes[0].info.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].info.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].nla_editor.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].nla_editor.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].nla_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].node_editor.space.back": [
+    0.102,
+    0.102,
+    0.118
+   ],
+   "themes[0].node_editor.space.header": [
+    0.102,
+    0.102,
+    0.118,
+    0.702
+   ],
+   "themes[0].node_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].node_editor.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].node_editor.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].outliner.active": [
+    0.455,
+    0.361,
+    0.345
+   ],
+   "themes[0].outliner.selected_highlight": [
+    0.29,
+    0.235,
+    0.231
+   ],
+   "themes[0].outliner.space.back": [
+    0.1569,
+    0.1569,
+    0.1729
+   ],
+   "themes[0].outliner.space.header": [
+    0.1569,
+    0.1569,
+    0.1729,
+    0.702
+   ],
+   "themes[0].outliner.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].preferences.match": [
+    0.455,
+    0.361,
+    0.345
+   ],
+   "themes[0].preferences.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].preferences.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].preferences.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].preferences.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].preferences.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].properties.match": [
+    0.455,
+    0.361,
+    0.345
+   ],
+   "themes[0].properties.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].properties.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].properties.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].properties.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].properties.space.title": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].regions.asset_shelf.back": [
+    0.22,
+    0.204,
+    0.22,
+    0.94
+   ],
+   "themes[0].regions.asset_shelf.header_back": [
+    0.1137,
+    0.1137,
+    0.1297,
+    1.0
+   ],
+   "themes[0].regions.channels.back": [
+    0.1137,
+    0.1137,
+    0.1297
+   ],
+   "themes[0].regions.scrubbing.back": [
+    0.1137,
+    0.1137,
+    0.1297,
+    1.0
+   ],
+   "themes[0].regions.scrubbing.text": [
+    0.502,
+    0.502,
+    0.518
+   ],
+   "themes[0].regions.sidebars.back": [
+    0.188,
+    0.188,
+    0.204,
+    0.94
+   ],
+   "themes[0].regions.sidebars.tab_back": [
+    0.157,
+    0.157,
+    0.173,
+    0.94
+   ],
+   "themes[0].sequence_editor.space.back": [
+    0.0941,
+    0.0941,
+    0.1101
+   ],
+   "themes[0].sequence_editor.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].sequence_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].sequence_editor.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].spreadsheet.space.back": [
+    0.1569,
+    0.1569,
+    0.1729
+   ],
+   "themes[0].spreadsheet.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].spreadsheet.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].statusbar.space.back": [
+    0.1882,
+    0.1882,
+    0.2042
+   ],
+   "themes[0].statusbar.space.header": [
+    0.0941,
+    0.0941,
+    0.1101,
+    0.702
+   ],
+   "themes[0].text_editor.cursor": [
+    0.886,
+    0.655,
+    0.608
+   ],
+   "themes[0].text_editor.line_numbers_background": [
+    0.1137,
+    0.1137,
+    0.1297
+   ],
+   "themes[0].text_editor.space.back": [
+    0.1373,
+    0.1373,
+    0.1533
+   ],
+   "themes[0].text_editor.space.header": [
+    0.1882,
+    0.1882,
+    0.2042,
+    0.702
+   ],
+   "themes[0].text_editor.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].text_editor.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].text_editor.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].topbar.space.back": [
+    0.0941,
+    0.0941,
+    0.1101
+   ],
+   "themes[0].topbar.space.header": [
+    0.0941,
+    0.0941,
+    0.1101,
+    0.702
+   ],
+   "themes[0].topbar.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].topbar.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.editor_border": [
+    0.0863,
+    0.0863,
+    0.1023
+   ],
+   "themes[0].user_interface.link": [
+    0.886,
+    0.655,
+    0.608,
+    1.0
+   ],
+   "themes[0].user_interface.panel_active": [
+    0.886,
+    0.655,
+    0.608,
+    1.0
+   ],
+   "themes[0].user_interface.panel_back": [
+    0.2201,
+    0.2201,
+    0.2361,
+    1.0
+   ],
+   "themes[0].user_interface.panel_header": [
+    0.2201,
+    0.2201,
+    0.2361,
+    1.0
+   ],
+   "themes[0].user_interface.panel_roundness": 0.6,
+   "themes[0].user_interface.panel_text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.panel_title": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_box.inner": [
+    0.0819,
+    0.0819,
+    0.0979,
+    0.502
+   ],
+   "themes[0].user_interface.wcol_box.inner_sel": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.item": [
+    0.0706,
+    0.0706,
+    0.0866,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.outline": [
+    0.1722,
+    0.1722,
+    0.1882,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.outline_sel": [
+    0.1722,
+    0.1722,
+    0.1882,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_box.roundness": 0.6,
+   "themes[0].user_interface.wcol_box.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_curve.inner": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_curve.inner_sel": [
+    0.0,
+    0.0,
+    0.016,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_curve.item": [
+    0.0,
+    0.0,
+    0.016,
+    0.349
+   ],
+   "themes[0].user_interface.wcol_curve.outline": [
+    0.3219,
+    0.3219,
+    0.3379,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_curve.roundness": 0.6,
+   "themes[0].user_interface.wcol_list_item.inner_sel": [
+    0.455,
+    0.361,
+    0.345,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_list_item.outline": [
+    0.1271,
+    0.1271,
+    0.1431,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_list_item.outline_sel": [
+    0.1271,
+    0.1271,
+    0.1431,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_list_item.roundness": 0.6,
+   "themes[0].user_interface.wcol_menu.inner": [
+    0.1129,
+    0.1129,
+    0.1289,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    0.702
+   ],
+   "themes[0].user_interface.wcol_menu.outline": [
+    0.1129,
+    0.1129,
+    0.1289,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu.roundness": 0.6,
+   "themes[0].user_interface.wcol_menu.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_menu.text_sel": [
+    0.949,
+    0.737,
+    0.69
+   ],
+   "themes[0].user_interface.wcol_menu_back.inner": [
+    0.0678,
+    0.0678,
+    0.0838,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.outline": [
+    0.1016,
+    0.1016,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.outline_sel": [
+    0.1016,
+    0.1016,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_back.roundness": 0.6,
+   "themes[0].user_interface.wcol_menu_item.inner": [
+    0.0678,
+    0.0678,
+    0.0838,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.outline": [
+    0.1722,
+    0.1722,
+    0.1882,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.outline_sel": [
+    0.1722,
+    0.1722,
+    0.1882,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_menu_item.roundness": 0.6,
+   "themes[0].user_interface.wcol_menu_item.text": [
+    0.754,
+    0.754,
+    0.754
+   ],
+   "themes[0].user_interface.wcol_menu_item.text_sel": [
+    0.949,
+    0.737,
+    0.69
+   ],
+   "themes[0].user_interface.wcol_num.inner": [
+    0.165,
+    0.165,
+    0.18,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.inner_sel": [
+    0.096,
+    0.096,
+    0.112,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.item": [
+    0.455,
+    0.361,
+    0.345,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.outline": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_num.roundness": 0.6,
+   "themes[0].user_interface.wcol_num.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_numslider.inner": [
+    0.165,
+    0.165,
+    0.18,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.inner_sel": [
+    0.096,
+    0.096,
+    0.112,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.item": [
+    0.455,
+    0.361,
+    0.345,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.outline": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_numslider.roundness": 0.6,
+   "themes[0].user_interface.wcol_numslider.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_option.inner": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.inner_sel": [
+    0.886,
+    0.655,
+    0.608,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.item": [
+    0.06,
+    0.06,
+    0.06,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.outline": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_option.roundness": 0.6,
+   "themes[0].user_interface.wcol_option.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_pie_menu.inner": [
+    0.0678,
+    0.0678,
+    0.0838,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.item": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.outline": [
+    0.1016,
+    0.1016,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.outline_sel": [
+    0.1016,
+    0.1016,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_pie_menu.roundness": 0.6,
+   "themes[0].user_interface.wcol_pie_menu.text": [
+    0.7404,
+    0.7404,
+    0.7404
+   ],
+   "themes[0].user_interface.wcol_pie_menu.text_sel": [
+    0.949,
+    0.737,
+    0.69
+   ],
+   "themes[0].user_interface.wcol_progress.inner": [
+    0.096,
+    0.096,
+    0.112,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.item": [
+    0.886,
+    0.655,
+    0.608,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.outline": [
+    0.1722,
+    0.1722,
+    0.1882,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.outline_sel": [
+    0.1722,
+    0.1722,
+    0.1882,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_progress.roundness": 0.6,
+   "themes[0].user_interface.wcol_progress.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_pulldown.inner": [
+    0.096,
+    0.096,
+    0.112,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_pulldown.outline": [
+    0.1722,
+    0.1722,
+    0.1882,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_pulldown.outline_sel": [
+    0.1722,
+    0.1722,
+    0.1882,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_pulldown.roundness": 0.6,
+   "themes[0].user_interface.wcol_pulldown.text": [
+    0.7404,
+    0.7404,
+    0.7404
+   ],
+   "themes[0].user_interface.wcol_radio.inner": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.item": [
+    0.1045,
+    0.1045,
+    0.1205,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.outline": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_radio.roundness": 0.6,
+   "themes[0].user_interface.wcol_radio.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_radio.text_sel": [
+    0.949,
+    0.737,
+    0.69
+   ],
+   "themes[0].user_interface.wcol_regular.inner": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.item": [
+    0.0819,
+    0.0819,
+    0.0979,
+    0.502
+   ],
+   "themes[0].user_interface.wcol_regular.outline": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_regular.roundness": 0.6,
+   "themes[0].user_interface.wcol_regular.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_scroll.inner": [
+    0.096,
+    0.096,
+    0.112,
+    0.0
+   ],
+   "themes[0].user_interface.wcol_scroll.item": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_scroll.outline": [
+    0.1722,
+    0.1722,
+    0.1882,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_scroll.outline_sel": [
+    0.1722,
+    0.1722,
+    0.1882,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_scroll.roundness": 0.6,
+   "themes[0].user_interface.wcol_scroll.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_tab.inner": [
+    0.0819,
+    0.0819,
+    0.0979,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.inner_sel": [
+    0.1355,
+    0.1355,
+    0.1515,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.item": [
+    0.0819,
+    0.0819,
+    0.0979,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.outline": [
+    0.0819,
+    0.0819,
+    0.0979,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.outline_sel": [
+    0.0819,
+    0.0819,
+    0.0979,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tab.roundness": 0.6,
+   "themes[0].user_interface.wcol_text.inner": [
+    0.14,
+    0.14,
+    0.155,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.inner_sel": [
+    0.0678,
+    0.0678,
+    0.0838,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.outline": [
+    0.0819,
+    0.0819,
+    0.0979,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_text.roundness": 0.6,
+   "themes[0].user_interface.wcol_text.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_toggle.inner": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.item": [
+    0.1045,
+    0.1045,
+    0.1205,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.outline": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toggle.roundness": 0.6,
+   "themes[0].user_interface.wcol_toggle.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_toggle.text_sel": [
+    0.949,
+    0.737,
+    0.69
+   ],
+   "themes[0].user_interface.wcol_tool.inner": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.outline": [
+    0.2372,
+    0.2372,
+    0.2532,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tool.roundness": 0.6,
+   "themes[0].user_interface.wcol_tool.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_tool.text_sel": [
+    0.949,
+    0.737,
+    0.69
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.inner": [
+    0.1129,
+    0.1129,
+    0.1289,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.outline": [
+    0.1129,
+    0.1129,
+    0.1289,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.outline_sel": [
+    0.659,
+    0.478,
+    0.439,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.roundness": 0.6,
+   "themes[0].user_interface.wcol_toolbar_item.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].user_interface.wcol_toolbar_item.text_sel": [
+    0.949,
+    0.737,
+    0.69
+   ],
+   "themes[0].user_interface.wcol_tooltip.inner": [
+    0.0819,
+    0.0819,
+    0.0979,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.inner_sel": [
+    0.361,
+    0.29,
+    0.282,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.outline": [
+    0.1016,
+    0.1016,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.outline_sel": [
+    0.1016,
+    0.1016,
+    0.1176,
+    1.0
+   ],
+   "themes[0].user_interface.wcol_tooltip.roundness": 0.6,
+   "themes[0].user_interface.wcol_tooltip.text": [
+    0.7404,
+    0.7404,
+    0.7404
+   ],
+   "themes[0].user_interface.widget_text_cursor": [
+    0.886,
+    0.655,
+    0.608
+   ],
+   "themes[0].view_3d.space.gradients.background_type": "LINEAR",
+   "themes[0].view_3d.space.gradients.gradient": [
+    0.059,
+    0.098,
+    0.176
+   ],
+   "themes[0].view_3d.space.gradients.high_gradient": [
+    0.071,
+    0.137,
+    0.235
+   ],
+   "themes[0].view_3d.space.header": [
+    0.204,
+    0.204,
+    0.22,
+    0.6
+   ],
+   "themes[0].view_3d.space.header_text": [
+    0.812,
+    0.812,
+    0.812
+   ],
+   "themes[0].view_3d.space.text": [
+    0.7847,
+    0.7847,
+    0.7847
+   ],
+   "themes[0].view_3d.space.title": [
+    0.812,
+    0.812,
+    0.812
+   ]
+  }
+ },
+ "blender": {
+  "system.use_region_overlap": true,
+  "themes[0].clip_editor.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].clip_editor.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].clip_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].clip_editor.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].console.cursor": [
+   0.4431,
+   0.6588,
+   1.0
+  ],
+  "themes[0].console.space.back": [
+   0.1137,
+   0.1137,
+   0.1137
+  ],
+  "themes[0].console.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].console.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].console.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].console.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].dopesheet_editor.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].dopesheet_editor.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].dopesheet_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].dopesheet_editor.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].file_browser.selected_file": [
+   0.2784,
+   0.4471,
+   0.702
+  ],
+  "themes[0].file_browser.space.back": [
+   0.1569,
+   0.1569,
+   0.1569
+  ],
+  "themes[0].file_browser.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].file_browser.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].file_browser.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].graph_editor.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].graph_editor.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].graph_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].image_editor.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].image_editor.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].image_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].image_editor.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].image_editor.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].info.info_selected": [
+   0.2314,
+   0.3373,
+   0.5373
+  ],
+  "themes[0].info.space.back": [
+   0.1137,
+   0.1137,
+   0.1137
+  ],
+  "themes[0].info.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].info.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].nla_editor.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].nla_editor.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].nla_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].node_editor.space.back": [
+   0.102,
+   0.102,
+   0.102
+  ],
+  "themes[0].node_editor.space.header": [
+   0.102,
+   0.102,
+   0.102,
+   0.702
+  ],
+  "themes[0].node_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].node_editor.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].node_editor.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].outliner.active": [
+   0.2,
+   0.302,
+   0.502
+  ],
+  "themes[0].outliner.selected_highlight": [
+   0.1137,
+   0.1922,
+   0.302
+  ],
+  "themes[0].outliner.space.back": [
+   0.1569,
+   0.1569,
+   0.1569
+  ],
+  "themes[0].outliner.space.header": [
+   0.1569,
+   0.1569,
+   0.1569,
+   0.702
+  ],
+  "themes[0].outliner.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].preferences.match": [
+   0.2784,
+   0.4471,
+   0.702
+  ],
+  "themes[0].preferences.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].preferences.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].preferences.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].preferences.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].preferences.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].properties.match": [
+   0.2784,
+   0.4471,
+   0.702
+  ],
+  "themes[0].properties.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].properties.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].properties.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].properties.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].properties.space.title": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].regions.asset_shelf.back": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.902
+  ],
+  "themes[0].regions.asset_shelf.header_back": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].regions.channels.back": [
+   0.1137,
+   0.1137,
+   0.1137
+  ],
+  "themes[0].regions.scrubbing.back": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].regions.scrubbing.text": [
+   0.502,
+   0.502,
+   0.502
+  ],
+  "themes[0].regions.sidebars.back": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.0
+  ],
+  "themes[0].regions.sidebars.tab_back": [
+   0.0941,
+   0.0941,
+   0.0941,
+   0.0
+  ],
+  "themes[0].sequence_editor.space.back": [
+   0.0941,
+   0.0941,
+   0.0941
+  ],
+  "themes[0].sequence_editor.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].sequence_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].sequence_editor.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].spreadsheet.space.back": [
+   0.1569,
+   0.1569,
+   0.1569
+  ],
+  "themes[0].spreadsheet.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].spreadsheet.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].statusbar.space.back": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].statusbar.space.header": [
+   0.0941,
+   0.0941,
+   0.0941,
+   0.702
+  ],
+  "themes[0].text_editor.cursor": [
+   0.4431,
+   0.6588,
+   1.0
+  ],
+  "themes[0].text_editor.line_numbers_background": [
+   0.1137,
+   0.1137,
+   0.1137
+  ],
+  "themes[0].text_editor.space.back": [
+   0.1373,
+   0.1373,
+   0.1373
+  ],
+  "themes[0].text_editor.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].text_editor.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].text_editor.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].text_editor.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].topbar.space.back": [
+   0.0941,
+   0.0941,
+   0.0941
+  ],
+  "themes[0].topbar.space.header": [
+   0.0941,
+   0.0941,
+   0.0941,
+   0.702
+  ],
+  "themes[0].topbar.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].topbar.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.editor_border": [
+   0.0863,
+   0.0863,
+   0.0863
+  ],
+  "themes[0].user_interface.link": [
+   0.4353,
+   0.6627,
+   0.902,
+   1.0
+  ],
+  "themes[0].user_interface.panel_active": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.panel_back": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.panel_header": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.panel_roundness": 0.4,
+  "themes[0].user_interface.panel_text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.panel_title": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_box.inner": [
+   0.1137,
+   0.1137,
+   0.1137,
+   0.502
+  ],
+  "themes[0].user_interface.wcol_box.inner_sel": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_box.item": [
+   0.098,
+   0.098,
+   0.098,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_box.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_box.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_box.roundness": 0.4,
+  "themes[0].user_interface.wcol_box.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_curve.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_curve.inner_sel": [
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_curve.item": [
+   0.0,
+   0.0,
+   0.0,
+   0.349
+  ],
+  "themes[0].user_interface.wcol_curve.outline": [
+   0.4471,
+   0.4471,
+   0.4471,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_curve.roundness": 0.4,
+  "themes[0].user_interface.wcol_list_item.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_list_item.outline": [
+   0.1765,
+   0.1765,
+   0.1765,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_list_item.outline_sel": [
+   0.1765,
+   0.1765,
+   0.1765,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_list_item.roundness": 0.4,
+  "themes[0].user_interface.wcol_menu.inner": [
+   0.1569,
+   0.1569,
+   0.1569,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   0.702
+  ],
+  "themes[0].user_interface.wcol_menu.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu.roundness": 0.4,
+  "themes[0].user_interface.wcol_menu.shadedown": 0,
+  "themes[0].user_interface.wcol_menu.shadetop": 0,
+  "themes[0].user_interface.wcol_menu.show_shaded": false,
+  "themes[0].user_interface.wcol_menu.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_menu.text_sel": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu_back.inner": [
+   0.0941,
+   0.0941,
+   0.0941,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu_back.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu_back.outline": [
+   0.1412,
+   0.1412,
+   0.1412,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu_back.outline_sel": [
+   0.1412,
+   0.1412,
+   0.1412,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu_back.roundness": 0.4,
+  "themes[0].user_interface.wcol_menu_item.inner": [
+   0.0941,
+   0.0941,
+   0.0941,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_menu_item.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_menu_item.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_menu_item.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_menu_item.roundness": 0.4,
+  "themes[0].user_interface.wcol_menu_item.text": [
+   0.8667,
+   0.8667,
+   0.8667
+  ],
+  "themes[0].user_interface.wcol_menu_item.text_sel": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_num.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_num.inner_sel": [
+   0.1333,
+   0.1333,
+   0.1333,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_num.item": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_num.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_num.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_num.roundness": 0.4,
+  "themes[0].user_interface.wcol_num.shadedown": 0,
+  "themes[0].user_interface.wcol_num.shadetop": 0,
+  "themes[0].user_interface.wcol_num.show_shaded": false,
+  "themes[0].user_interface.wcol_num.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_numslider.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_numslider.inner_sel": [
+   0.1333,
+   0.1333,
+   0.1333,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_numslider.item": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_numslider.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_numslider.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_numslider.roundness": 0.4,
+  "themes[0].user_interface.wcol_numslider.shadedown": 0,
+  "themes[0].user_interface.wcol_numslider.shadetop": 0,
+  "themes[0].user_interface.wcol_numslider.show_shaded": false,
+  "themes[0].user_interface.wcol_numslider.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_option.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_option.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_option.item": [
+   1.0,
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_option.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_option.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_option.roundness": 0.4,
+  "themes[0].user_interface.wcol_option.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_pie_menu.inner": [
+   0.0941,
+   0.0941,
+   0.0941,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_pie_menu.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_pie_menu.item": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_pie_menu.outline": [
+   0.1412,
+   0.1412,
+   0.1412,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_pie_menu.outline_sel": [
+   0.1412,
+   0.1412,
+   0.1412,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_pie_menu.roundness": 0.4,
+  "themes[0].user_interface.wcol_pie_menu.text": [
+   0.851,
+   0.851,
+   0.851
+  ],
+  "themes[0].user_interface.wcol_pie_menu.text_sel": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_progress.inner": [
+   0.1333,
+   0.1333,
+   0.1333,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_progress.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_progress.item": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_progress.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_progress.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_progress.roundness": 0.4,
+  "themes[0].user_interface.wcol_progress.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_pulldown.inner": [
+   0.1333,
+   0.1333,
+   0.1333,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_pulldown.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_pulldown.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_pulldown.roundness": 0.4,
+  "themes[0].user_interface.wcol_pulldown.text": [
+   0.851,
+   0.851,
+   0.851
+  ],
+  "themes[0].user_interface.wcol_radio.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_radio.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_radio.item": [
+   0.1451,
+   0.1451,
+   0.1451,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_radio.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_radio.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_radio.roundness": 0.4,
+  "themes[0].user_interface.wcol_radio.shadedown": 0,
+  "themes[0].user_interface.wcol_radio.shadetop": 0,
+  "themes[0].user_interface.wcol_radio.show_shaded": false,
+  "themes[0].user_interface.wcol_radio.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_radio.text_sel": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_regular.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_regular.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_regular.item": [
+   0.1137,
+   0.1137,
+   0.1137,
+   0.502
+  ],
+  "themes[0].user_interface.wcol_regular.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_regular.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_regular.roundness": 0.4,
+  "themes[0].user_interface.wcol_regular.shadedown": 0,
+  "themes[0].user_interface.wcol_regular.shadetop": 0,
+  "themes[0].user_interface.wcol_regular.show_shaded": false,
+  "themes[0].user_interface.wcol_regular.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_scroll.inner": [
+   0.1333,
+   0.1333,
+   0.1333,
+   0.0
+  ],
+  "themes[0].user_interface.wcol_scroll.item": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_scroll.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_scroll.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_scroll.roundness": 1.0,
+  "themes[0].user_interface.wcol_scroll.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_tab.inner": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tab.inner_sel": [
+   0.1882,
+   0.1882,
+   0.1882,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tab.item": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tab.outline": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tab.outline_sel": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tab.roundness": 0.4,
+  "themes[0].user_interface.wcol_text.inner": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_text.inner_sel": [
+   0.0941,
+   0.0941,
+   0.0941,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_text.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_text.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_text.roundness": 0.4,
+  "themes[0].user_interface.wcol_text.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_toggle.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toggle.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toggle.item": [
+   0.1451,
+   0.1451,
+   0.1451,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toggle.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toggle.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toggle.roundness": 0.4,
+  "themes[0].user_interface.wcol_toggle.shadedown": 0,
+  "themes[0].user_interface.wcol_toggle.shadetop": 0,
+  "themes[0].user_interface.wcol_toggle.show_shaded": false,
+  "themes[0].user_interface.wcol_toggle.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_toggle.text_sel": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tool.inner": [
+   0.3294,
+   0.3294,
+   0.3294,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tool.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tool.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tool.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tool.roundness": 0.4,
+  "themes[0].user_interface.wcol_tool.shadedown": 0,
+  "themes[0].user_interface.wcol_tool.shadetop": 0,
+  "themes[0].user_interface.wcol_tool.show_shaded": false,
+  "themes[0].user_interface.wcol_tool.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_tool.text_sel": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toolbar_item.inner": [
+   0.1569,
+   0.1569,
+   0.1569,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toolbar_item.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toolbar_item.outline": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toolbar_item.outline_sel": [
+   0.2392,
+   0.2392,
+   0.2392,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_toolbar_item.roundness": 0.4,
+  "themes[0].user_interface.wcol_toolbar_item.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].user_interface.wcol_toolbar_item.text_sel": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tooltip.inner": [
+   0.1137,
+   0.1137,
+   0.1137,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tooltip.inner_sel": [
+   0.2784,
+   0.4471,
+   0.702,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tooltip.outline": [
+   0.1412,
+   0.1412,
+   0.1412,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tooltip.outline_sel": [
+   0.1412,
+   0.1412,
+   0.1412,
+   1.0
+  ],
+  "themes[0].user_interface.wcol_tooltip.roundness": 0.4,
+  "themes[0].user_interface.wcol_tooltip.text": [
+   0.851,
+   0.851,
+   0.851
+  ],
+  "themes[0].user_interface.widget_text_cursor": [
+   0.4431,
+   0.6588,
+   1.0
+  ],
+  "themes[0].view_3d.space.gradients.background_type": "SINGLE_COLOR",
+  "themes[0].view_3d.space.gradients.gradient": [
+   0.1882,
+   0.1882,
+   0.1882
+  ],
+  "themes[0].view_3d.space.gradients.high_gradient": [
+   0.2392,
+   0.2392,
+   0.2392
+  ],
+  "themes[0].view_3d.space.header": [
+   0.1882,
+   0.1882,
+   0.1882,
+   0.702
+  ],
+  "themes[0].view_3d.space.header_text": [
+   0.9333,
+   0.9333,
+   0.9333
+  ],
+  "themes[0].view_3d.space.text": [
+   0.902,
+   0.902,
+   0.902
+  ],
+  "themes[0].view_3d.space.title": [
+   0.9333,
+   0.9333,
+   0.9333
+  ]
+ }
+}

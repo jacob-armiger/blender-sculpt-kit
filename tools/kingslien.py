@@ -68,6 +68,60 @@ def adjusted_alpha(z, size):
     return zb_curve(a, z['curves']['AlphaAdjust'])
 
 
+def footprint(a):
+    """Where a clay-type ZBrush brush ends up laying clay, from its alpha: flat-topped over nearly all of it.
+
+    ZBrush's buildup keeps adding until the stroke is level, so anything brighter than about a seventh of
+    full alpha comes out at full height. Blender's Clay Strips does the opposite with an alpha: only its
+    brightest part reaches full height. Given ZBrush's alpha as it is, the rake's tines came out at half
+    the width of ZBrush's, with gaps three times as wide. The thresholds are fitted to Jacob's ZBrush
+    screenshots of 2026-10-06."""
+    t = np.clip((a - 0.025) / (0.15 - 0.025), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+# Where the rake's tines meet, across the stroke in brush radii, read off Jacob's ZBrush screenshot of
+# 2026-10-07: the middle tine takes up nearly half the stroke and the side tines about a quarter each.
+RAKE_NOTCHES = (-0.46, 0.40)
+RAKE_CROWN = 0.25
+
+
+def rake_alpha(z, size=512):
+    """The rake's alpha as Blender needs it to leave the stroke ZBrush leaves: one band the width of the
+    rake, with a narrow V-shaped notch where each side tine meets the wide middle one.
+
+    ZBrush gets that from an alpha of three separate bars, because its clay fills in between the tines as
+    it builds: in the screenshots the tines are pressed up against each other with no flat gap between.
+    Blender's Clay Strips stamps an alpha as it is, gaps included, and the falloff curve has no say across
+    a square tip (three different curves measured the same). So the alpha carries the result instead:
+      - ZBrush's three bars are filled out and grown sideways until the gaps between them close;
+      - the band fades out before the edge of the brush, for soft outer shoulders;
+      - a notch is cut at each place two tines meet.
+    Measured at full pressure, in brush radii: side tines 0.44 and 0.50 wide, middle 0.80 wide, and the
+    notches come down to about 40% of the tines' height."""
+    x = np.linspace(-1.0, 1.0, size)[None, :]
+    bars = footprint(upsample(alpha_array(z), size))
+    grow = max(1, round(0.09 * size / 2.0))
+    band = np.maximum.reduce([np.roll(bars, shift, axis=1) for shift in range(-grow, grow + 1)])
+    sigma = 0.03 * size / 2.0
+    k = np.arange(-int(3 * sigma) - 1, int(3 * sigma) + 2)
+    kernel = np.exp(-0.5 * (k / sigma) ** 2)
+    kernel /= kernel.sum()
+    band = np.stack([np.convolve(np.pad(row, len(k) // 2, mode='edge'), kernel, mode='valid') for row in band])
+    t = np.clip((np.abs(x) - 0.80) / 0.18, 0.0, 1.0)
+    band *= 1.0 - t * t * (3.0 - 2.0 * t)
+    notches = sum(np.exp(-((x - centre) / 0.04) ** 2) for centre in RAKE_NOTCHES)
+    # A slight crown on each tine, so that its top is a little domed and not dead flat: full in the middle
+    # of the tine, RAKE_CROWN less at its edges.
+    edges = (-0.9,) + RAKE_NOTCHES + (0.9,)
+    crown = np.ones_like(x)
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        inside = (x >= lo) & (x <= hi)
+        u = (x - (lo + hi) / 2.0) / ((hi - lo) / 2.0)
+        crown = np.where(inside, 1.0 - RAKE_CROWN * u * u, crown)
+    return band * crown * (1.0 - 0.8 * notches)
+
+
 def radial_profile(a, radii):
     """Mean alpha value at each normalised radius (0 = centre, 1 = edge)."""
     h, w = a.shape
@@ -113,14 +167,21 @@ def set_falloff(brush, pts):
     brush_settings.set_falloff(brush, pts)
 
 
-def pressure_curves(brush, z):
+def pressure_curves(brush, z, strength=True):
     """ZBrush's tablet curves for this brush: how pen pressure scales size and strength.
 
     Each is [(pressure, share), ...]. ZBrush keeps a minimum size at the
     lightest touch, where Blender's default curve goes all the way to zero.
+
+    Clay-type brushes pass strength=False. In ZBrush a clay stroke at half pressure stands about a third as
+    high as at full pressure: its size curve times its intensity curve. Blender's Clay Strips already loses
+    that much height from the smaller size alone (measured: 0.69, 0.39 and 0.15 of full height at three
+    quarters, half and quarter pressure, against ZBrush's 0.63, 0.35 and 0.15). With the intensity curve
+    applied as well it kept only 0.18 at half pressure and 0.03 at a quarter: a normal pen touch left
+    almost nothing.
     """
     brush.use_pressure_size = True
-    brush.use_pressure_strength = True
+    brush.use_pressure_strength = strength
     brush_settings.set_curve(brush.curve_size, z['curves']['Size'])
     brush_settings.set_curve(brush.curve_strength, z['curves']['Z Intensity'])
 
@@ -181,9 +242,6 @@ def lazy_mouse(brush, z, radius):
 
 
 FLAT_SOFT_EDGE = [(0.0, 1.0), (0.7, 1.0), (1.0, 0.0)]
-# ZBrush fades a brush between its inner and outer cursor rings, so the outer
-# tines of the rake bite less than the middle one
-INNER_RING = [(0.0, 1.0), (0.45, 1.0), (0.75, 0.45), (1.0, 0.0)]
 
 
 def build_brushes():
@@ -197,46 +255,53 @@ def build_brushes():
     # --- Kingslien_Clay: clay-type brush, Buildup on, round flat-topped alpha.
     z = load_zbp('Kingslien_Clay')
     radii = [0.0, 0.5, 0.65, 0.75, 0.82, 0.88, 0.94, 1.0]
-    profile = list(zip(radii, radial_profile(alpha_array(z), radii)))
+    profile = list(zip(radii, footprint(np.array(radial_profile(alpha_array(z), radii))).tolist()))
     b = new_brush('Kingslien_Clay', base['Clay Strips'],
                   'Round clay buildup brush. Ctrl to carve.')
     # a fully round tip sweeps a domed stroke; 0.7 gives the flat-topped ribbon
     # with a soft edge that the ZBrush brush lays down
     b.tip_roundness = 0.7
     b.use_accumulate = bool(z['params']['Buildup'][0][1])
-    b.strength = 0.5
+    # Strong, smoothing as it goes, with a low plane: one pass buries what is under it, as ZBrush's clay
+    # does, and the ribbon keeps soft shoulders. Blender's clay pulls the surface only part of the way to
+    # its plane on each dab, by its strength. Measured over rake marks at full pressure: strength 0.5 left
+    # 35% of them standing, 0.75 with auto-smooth leaves 4%, 1.0 leaves 2% but stamps a hard-edged slab
+    # with a step at every dab, and auto-smooth does nothing there because each dab flattens it again.
+    # Strength also raises the stroke, so the plane comes down from Clay Strips' 0.15 to keep a plain
+    # stroke at 0.13 of a brush radius. Accumulate stays on (ZBrush's Buildup): without it the same
+    # settings stood 0.08 high and left twice as much of the rake.
+    b.strength = 0.75
+    b.plane_offset = 0.11
+    b.auto_smooth_factor = 0.5
     b.spacing = 5
-    pressure_curves(b, z)
+    pressure_curves(b, z, strength=False)
     set_falloff(b, profile)
     set_preview(b, alpha_array(z))
 
-    # --- Kingslien_Rake / Rake_V2: the same clay-type brush with a three-tine alpha.
-    for stem in ('Kingslien_Rake', 'Kingslien_Rake_V2'):
+    # --- Kingslien_Rake_V2: the same clay-type brush with a three-tine alpha. The first Kingslien_Rake
+    #     (same alpha, no depth limit) is no longer built: Jacob kept V2 alone on 2026-10-07.
+    for stem in ('Kingslien_Rake_V2',):
         z = load_zbp(stem)
-        tines = adjusted_alpha(z, 512)
+        tines = rake_alpha(z)
         b = new_brush(stem, base['Clay Strips'],
                       'Three-tine clay rake that follows the stroke. Ctrl to cut grooves.')
+        # a square tip: across it the falloff curve has no say, the alpha alone shapes the stroke
         b.tip_roundness = 0.0
         b.use_accumulate = bool(z['params']['Buildup'][0][1])
-        b.strength = 0.5
+        # The settings Jacob arrived at for the clay with the pen on 2026-10-07 (tuning/brushes.toml), so
+        # that the two feel alike: his strength, the lower plane, smoothing as it goes, and pressure on
+        # strength as well as size.
+        b.strength = 0.4313
+        b.plane_offset = 0.11
+        b.auto_smooth_factor = 0.5
         b.spacing = 5
         pressure_curves(b, z)
-        set_falloff(b, INNER_RING)
         use_alpha_texture(b, make_texture(stem + '_alpha', tines))
         if z['params']['Depth Mask'][0][1]:
             # V2 limits how far from the surface the rake works (ZBrush Depth Mask)
             b.use_plane_trim = True
             b.plane_trim = param(z, 'OuterDepth') - param(z, 'InnerDepth')
         set_preview(b, tines)
-
-    # --- ClayStrips_Rake: Blender's own Clay Strips, untouched, with only the Kingslien rake alpha
-    #     added and set to follow the stroke. For comparing against the tuned ports above.
-    z = load_zbp('Kingslien_Rake')
-    tines = adjusted_alpha(z, 512)
-    b = new_brush('ClayStrips_Rake', base['Clay Strips'],
-                  "Blender's Clay Strips exactly as it ships, with the Kingslien rake alpha. Nothing else changed.")
-    use_alpha_texture(b, make_texture('ClayStrips_Rake_alpha', tines))
-    set_preview(b, tines)
 
     # --- Kingslien_HairTexture: standard brush, tines hardened into strands,
     #     MidValue 0.4 so strands rise and the gaps between them sink.
@@ -454,13 +519,13 @@ def build(tune):
     bpy.ops.object.mode_set(mode='SCULPT')
     build_brushes()
     for brush in bpy.data.brushes:
-        if brush.name.startswith(('Kingslien', 'ClayStrips')):
+        if brush.name.startswith('Kingslien'):
             tune(brush)
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.data.objects.remove(ob)
     bpy.data.meshes.remove(mesh)
     # entering Sculpt Mode links Blender's own default brush; keep only ours
-    for brush in [b for b in bpy.data.brushes if not b.name.startswith(('Kingslien', 'ClayStrips'))]:
+    for brush in [b for b in bpy.data.brushes if not b.name.startswith('Kingslien')]:
         bpy.data.brushes.remove(brush)
     for lib in list(bpy.data.libraries):
         bpy.data.libraries.remove(lib)

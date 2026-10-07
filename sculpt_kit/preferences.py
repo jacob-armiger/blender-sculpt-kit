@@ -49,7 +49,7 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
     use_zbrush_keys: BoolProperty(name="ZBrush navigation and keys", default=True,
                                   update=_feature_switch("zbrush_keys"))
     use_zbrush_look: BoolProperty(name="ZBrush look", default=True, update=_look_switch)
-    use_kit_brushes: BoolProperty(name="Move and rake brushes", default=True,
+    use_kit_brushes: BoolProperty(name="Move brush", default=True,
                                   update=_feature_switch("kit_brushes"))
     use_kingslien_brushes: BoolProperty(name="Kingslien brushes", default=True,
                                         update=_feature_switch("kingslien_brushes"))

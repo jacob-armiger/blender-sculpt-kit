@@ -17,11 +17,11 @@ FEATURES = (
     Feature("zbrush_look", "ZBrush look",
             "Colour theme, layout, shelf, subtool list and material that make Blender read like ZBrush or KlaySculpt",
             zbrush_look.enable, zbrush_look.disable),
-    Feature("kit_brushes", "Move and rake brushes",
-            "Brush library with a Move brush that grabs through the whole model, and two thin-toothed clay rakes",
+    Feature("kit_brushes", "Move brush",
+            "Brush library with a Move brush that grabs through the whole model",
             brush_library.enable_kit, brush_library.disable_kit),
     Feature("kingslien_brushes", "Kingslien brushes",
-            "Brush library with the Clay, Rake, HairTexture and Knife brushes ported from ZBrush",
+            "Brush library with the Clay, Rake V2, HairTexture and Knife brushes ported from ZBrush",
             brush_library.enable_kingslien, brush_library.disable_kingslien),
     Feature("reference_view", "Synced reference view",
             "Sidebar button that splits the viewport: reference on the left, sculpt on the right, same view, same frame",
@@ -33,7 +33,7 @@ FEATURES = (
             "Voxel Remesh by resolution on Ctrl + R, like DynaMesh, and a Quad Remesh that repairs the mesh first",
             remesh.enable, remesh.disable),
     Feature("brush_tuning", "Brush tuning helper",
-            "Sidebar button that copies the active brush's settings, for pen-testing rounds",
+            "Sidebar buttons that copy the active brush's settings or return it to its saved ones",
             brush_tuning.enable, brush_tuning.disable),
 )
 BY_ID = {f.id: f for f in FEATURES}

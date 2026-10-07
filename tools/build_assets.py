@@ -2,7 +2,7 @@
 
     blender -b --factory-startup --python tools/build_assets.py
 
-Writes sculpt_kit/assets/kit (the kit's own brushes: Move and two rakes) and
+Writes sculpt_kit/assets/kit (the kit's own brush: Move) and
 sculpt_kit/assets/kingslien (the Kingslien pack, built from the ZBrush files
 in brush_sources/kingslien). Overrides from tuning/brushes.toml are applied to
 both, which is how pen-testing feedback gets baked in.
@@ -25,18 +25,6 @@ ASSETS = os.path.join(PACKAGE, "assets")
 KIT_ALPHAS = os.path.join(ROOT, "build", "kit_alphas")  # intermediate; the images are packed into the .blend
 KIT_CATALOG_ID = "3c0d1a52-7e41-4b4e-8f6a-2d9b61c7a0e4"
 KIT_CATALOG = "Sculpt Kit"
-
-# The kit's rakes: name, number of teeth, how much of each tooth's share of the width is ridge, description.
-# Kingslien's rake has three broad tines. These have thin teeth, for the scratched finish of a wire rake on clay.
-RAKES = (
-    ("SculptKit_Rake", 5, 0.55,
-     "Clay rake with five thin teeth that follow the stroke. Holds its lines on a medium mesh"),
-    ("SculptKit_Rake_Fine", 10, 0.5,
-     "Fine clay rake with ten teeth, for a scratched finish. Needs a dense mesh to keep its lines"),
-)
-RAKE_FALLOFF = [(0.0, 1.0), (0.45, 1.0), (0.75, 0.45), (1.0, 0.0)]  # the outer teeth bite less than the middle ones
-RAKE_PRESSURE = [(0.0, 0.2), (1.0, 1.0)]  # share of the strength at the lightest touch and at full pressure
-
 
 def load_tuning():
     with open(os.path.join(ROOT, "tuning", "brushes.toml"), "rb") as f:
@@ -70,25 +58,6 @@ def arrow_image():
     return np.where(shaft | head, 1.0, 0.0)
 
 
-def rake_alpha(teeth, ridge, size=512, margin=0.07, uneven=0.6, seed=7):
-    """A row of teeth across the stroke, the same all the way along it.
-
-    No real rake is perfect, so each tooth is a little off in height, width and
-    position. That keeps the marks from looking ruled. The same seed gives the
-    same teeth on every build.
-    """
-    rng = np.random.default_rng(seed)
-    across = (np.arange(size) + 0.5) / size
-    profile = np.zeros(size)
-    pitch = (1.0 - 2.0 * margin) / teeth
-    for k in range(teeth):
-        centre = margin + (k + 0.5) * pitch + rng.uniform(-1.0, 1.0) * uneven * pitch * 0.25
-        height = 1.0 - rng.uniform(0.0, 1.0) * uneven * 0.5
-        half_width = ridge * pitch * 0.5 * (1.0 + rng.uniform(-1.0, 1.0) * uneven * 0.3)
-        profile = np.maximum(profile, height * np.clip(1.0 - np.abs(across - centre) / half_width, 0.0, 1.0) ** 0.7)
-    return np.tile(profile, (size, 1))
-
-
 def as_asset(brush, description):
     brush.asset_clear()
     brush.asset_mark()
@@ -112,8 +81,8 @@ def build_kit(tuning):
     essentials = glob.glob(os.path.join(bpy.utils.system_resource('DATAFILES'),
                                         "assets", "brushes", "*mesh_sculpt*.blend"))[0]
     with bpy.data.libraries.load(essentials) as (_src, dst):
-        dst.brushes = ["Grab", "Clay Strips"]
-    grab, clay_strips = dst.brushes
+        dst.brushes = ["Grab"]
+    grab = dst.brushes[0]
 
     # Move: Blender's Grab only reaches the surface nearest the click. Projected
     # falloff takes everything under the brush circle, front and back, the way
@@ -125,26 +94,6 @@ def build_kit(tuning):
     as_asset(move, "Moves everything under the brush, front and back, like ZBrush's Move")
     set_preview(move, arrow_image())
     tune(move, tuning)
-
-    for name, teeth, ridge, description in RAKES:
-        alpha = rake_alpha(teeth, ridge)
-        rake = clay_strips.copy()
-        rake.name = name
-        as_asset(rake, description)
-        rake.tip_roundness = 0.0
-        rake.use_accumulate = False  # one pass leaves one depth of mark, however long the stroke lingers
-        rake.strength = 0.45
-        rake.spacing = 1  # at Blender's usual 5 each dab shows, and a ridge reads as a zip rather than a line
-        rake.input_samples = 3
-        # A rake's teeth stay the same distance apart however hard it is pressed, so the pen sets
-        # only how deep they bite. With size on pressure the lines wander and break up.
-        rake.use_pressure_size = False
-        rake.use_pressure_strength = True
-        brush_settings.set_curve(rake.curve_strength, RAKE_PRESSURE)
-        brush_settings.set_falloff(rake, RAKE_FALLOFF)
-        kingslien.use_alpha_texture(rake, kingslien.make_texture(name + "_alpha", alpha, KIT_ALPHAS))
-        set_preview(rake, alpha[::2, ::2])
-        tune(rake, tuning)
 
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.data.objects.remove(ob)

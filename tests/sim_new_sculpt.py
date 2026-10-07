@@ -101,8 +101,9 @@ def test(sim):
     sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
     yield 1.0
     beside = bpy.context.active_object
+    # To within a pixel of it: the middle of a canvas an odd number of pixels wide falls between two pixels.
     sim.check("with the sculpt off to the side, the sphere goes to the point the view turns about",
-              close(beside.location, rv3d.view_location, 1e-3) and in_the_middle(beside) and across(beside, 2.0)
+              close(beside.location, rv3d.view_location, 5e-3) and in_the_middle(beside) and across(beside, 2.0)
               and close(rv3d.view_matrix, view, 1e-6), (tuple(beside.location), tuple(rv3d.view_location)))
     sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
     yield 1.0

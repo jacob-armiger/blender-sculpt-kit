@@ -2,6 +2,8 @@
 
 Adjust a brush while sculpting, press Copy Tuning, and paste the block into
 tuning/brushes.toml. The next build bakes those values into the brush.
+Reset to Saved throws the adjustments away: the brush goes back to what its
+library holds.
 """
 import bpy
 
@@ -28,6 +30,30 @@ class SCULPTKIT_OT_copy_brush_tuning(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class SCULPTKIT_OT_reset_brush(bpy.types.Operator):
+    """Return the active brush to its saved settings, as its brush library holds them.
+Everything changed on it since it was picked is lost"""
+    bl_idname = "sculptkit.reset_brush"
+    bl_label = "Reset to Saved"
+
+    @classmethod
+    def poll(cls, context):
+        # Blender's own check: the brush has to come from a library to have anything to go back to.
+        return _brush(context) is not None and bpy.ops.brush.asset_revert.poll()
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        name = _brush(context).name
+        if 'FINISHED' not in bpy.ops.brush.asset_revert():
+            self.report({'ERROR'}, "Could not reset %s" % name)
+            return {'CANCELLED'}
+        common.redraw_all()
+        self.report({'INFO'}, "%s is back to its saved settings" % name)
+        return {'FINISHED'}
+
+
 class SCULPTKIT_PT_brush_tuning(bpy.types.Panel):
     bl_label = "Brush Tuning"
     bl_space_type = 'VIEW_3D'
@@ -49,9 +75,10 @@ class SCULPTKIT_PT_brush_tuning(bpy.types.Panel):
         col.prop(brush, "use_pressure_size", text="Pressure Changes Size")
         col.prop(brush, "use_pressure_strength", text="Pressure Changes Strength")
         col.operator(SCULPTKIT_OT_copy_brush_tuning.bl_idname, icon='COPYDOWN')
+        col.operator(SCULPTKIT_OT_reset_brush.bl_idname, icon='LOOP_BACK')
 
 
-_classes = (SCULPTKIT_OT_copy_brush_tuning, SCULPTKIT_PT_brush_tuning)
+_classes = (SCULPTKIT_OT_copy_brush_tuning, SCULPTKIT_OT_reset_brush, SCULPTKIT_PT_brush_tuning)
 
 
 def enable():

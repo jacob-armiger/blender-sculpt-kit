@@ -91,7 +91,7 @@ LOOK_CLASSES = ("SCULPTKIT_OT_zbrush_layout", "SCULPTKIT_OT_brush_direction", "S
                 "SCULPTKIT_OT_subtool_merge_down", "SCULPTKIT_OT_subtool_delete", "SCULPTKIT_PT_subtools")
 for cls in ("SCULPTKIT_OT_canvas_navigate", "SCULPTKIT_OT_canvas_mask", "SCULPTKIT_OT_divide",
             "SCULPTKIT_OT_reference_view", "SCULPTKIT_PT_reference_view", "SCULPTKIT_OT_new_sculpt",
-            "SCULPTKIT_PT_sculpt_session", "SCULPTKIT_OT_copy_brush_tuning", "SCULPTKIT_PT_brush_tuning",
+            "SCULPTKIT_PT_sculpt_session", "SCULPTKIT_OT_copy_brush_tuning", "SCULPTKIT_OT_reset_brush", "SCULPTKIT_PT_brush_tuning",
             "SCULPTKIT_OT_voxel_remesh", "SCULPTKIT_OT_quad_remesh", "SCULPTKIT_PT_remesh") + LOOK_CLASSES:
     check("registered " + cls, registered(cls))
 
@@ -352,34 +352,11 @@ if move is not None:
           "%s %s" % (move.sculpt_brush_type, move.falloff_shape))
 
 
-def teeth_of(brush):
-    """How many separate teeth the brush's alpha has across the stroke."""
-    image = brush.texture.image
-    width, height = image.size
-    row = np.array(image.pixels[:]).reshape(height, width, -1)[height // 2, :, 0]
-    return int(((row[1:] > 0.15) & (row[:-1] <= 0.15)).sum())
-
-
-rakes = {b.name: b for b in dst.brushes if "Rake" in b.name}
-check("two rakes in the kit library", sorted(rakes) == ["SculptKit_Rake", "SculptKit_Rake_Fine"], sorted(rakes))
-for name, teeth in (("SculptKit_Rake", 5), ("SculptKit_Rake_Fine", 10)):
-    rake = rakes.get(name)
-    if rake is None:
-        continue
-    check("%s is a clay rake with %d teeth that follow the stroke" % (name, teeth),
-          rake.sculpt_brush_type == 'CLAY_STRIPS' and rake.texture_slot.use_rake and teeth_of(rake) == teeth,
-          (rake.sculpt_brush_type, teeth_of(rake)))
-    lightest = tuple(round(v, 2) for v in rake.curve_strength.curves[0].points[0].location)
-    check("%s: pen pressure sets how deep it bites, not how wide it is" % name,
-          not rake.use_pressure_size and rake.use_pressure_strength and lightest == (0.0, 0.2), lightest)
 with bpy.data.libraries.load(os.path.join(kingslien_library, "Kingslien_Brushes.blend"), assets_only=True) as (src, dst):
     dst.brushes = list(src.brushes)
 names = sorted(b.name for b in dst.brushes)
-check("six Kingslien brushes bundled, and the plain Clay Strips rake", len(names) == 7 and "ClayStrips_Rake" in names, names)
-plain = next(b for b in dst.brushes if b.name == "ClayStrips_Rake")
-check("the plain Clay Strips rake changes nothing but the alpha", plain.sculpt_brush_type == 'CLAY_STRIPS'
-      and plain.texture is not None and plain.texture_slot.use_rake and plain.curve_distance_falloff_preset != 'CUSTOM',
-      plain.curve_distance_falloff_preset)
+check("five Kingslien brushes bundled, Rake V2 the only rake", len(names) == 5
+      and [n for n in names if "Rake" in n] == ["Kingslien_Rake_V2"], names)
 clay = next(b for b in dst.brushes if b.name == "Kingslien_Clay")
 size_curve = [tuple(round(v, 3) for v in p.location) for p in clay.curve_size.curves[0].points]
 check("Clay keeps a quarter of its size at the lightest pressure", clay.use_pressure_size and size_curve[0] == (0.0, 0.25),

@@ -19,7 +19,6 @@ LIBRARY = "Sculpt Kit Kingslien"
 # brush -> what its stroke should do to a flat surface
 BRUSHES = (
     ("Kingslien_Clay", "raise"),
-    ("Kingslien_Rake", "raise"),
     ("Kingslien_Rake_V2", "raise"),
     ("Kingslien_HairTexture", "both"),
     ("Kingslien_Knife", "cut"),
@@ -145,6 +144,23 @@ def test(sim):
     ratio = light / full if full else 0.0
     sim.check("Kingslien_KnifeSoft_DS at a light touch keeps about a quarter of its width", 0.18 < ratio < 0.45,
               "light %.3f / full %.3f = %.2f" % (light, full, ratio))
+
+    # ------------------------------------------------------- back to the saved brush
+    activate(sim, "Kingslien_Clay")
+    yield 0.3
+    brush = sculpt.brush
+    saved = (brush.strength, brush.use_pressure_size, brush.auto_smooth_factor, brush.plane_offset)
+    brush.strength = 0.123
+    brush.use_pressure_size = not saved[1]
+    brush.auto_smooth_factor = 0.99
+    brush.plane_offset = 0.5
+    yield 0.2
+    result = sim.call(bpy.ops.sculptkit.reset_brush)
+    yield 0.3
+    brush = sculpt.brush
+    now = (brush.strength, brush.use_pressure_size, brush.auto_smooth_factor, brush.plane_offset)
+    sim.check("Reset to Saved returns a changed brush to its saved settings", result == {'FINISHED'}
+              and brush.name == "Kingslien_Clay" and all(abs(a - b) < 1e-6 for a, b in zip(now, saved)), (now, saved))
 
     with sim.override():
         bpy.ops.brush.asset_activate(asset_library_type='ESSENTIALS',

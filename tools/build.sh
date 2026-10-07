@@ -5,9 +5,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BLENDER="${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}"
 
-"$BLENDER" -b --factory-startup --python "$ROOT/tools/build_assets.py"
-"$BLENDER" -b --factory-startup --python "$ROOT/tools/build_theme.py"
-"$BLENDER" -b --factory-startup --python "$ROOT/tools/build_matcap.py"
+"$BLENDER" -b --factory-startup --python-exit-code 1 --python "$ROOT/tools/build_assets.py"
+"$BLENDER" -b --factory-startup --python-exit-code 1 --python "$ROOT/tools/build_theme.py"
+"$BLENDER" -b --factory-startup --python-exit-code 1 --python "$ROOT/tools/build_matcap.py"
 
 mkdir -p "$ROOT/dist"
 "$BLENDER" --factory-startup --command extension build \

@@ -15,3 +15,65 @@
 # [brushes."Kingslien_Clay"]
 # strength = 0.6
 # use_pressure_size = true
+
+# Jacob's pen tuning, 2026-10-07, copied from Blender with Copy Tuning.
+[brushes."Kingslien_Clay"]
+strength = 0.4313
+spacing = 5
+hardness = 0.0
+auto_smooth_factor = 0.5
+normal_radius_factor = 1.2
+area_radius_factor = 0.5
+tip_roundness = 0.7
+tip_scale_x = 1.0
+crease_pinch_factor = 0.5
+plane_offset = 0.11
+plane_trim = 0.5
+texture_sample_bias = 0.0
+smooth_stroke_radius = 75
+smooth_stroke_factor = 0.9
+input_samples = 6
+normal_weight = 0.0
+use_pressure_size = true
+use_pressure_strength = true
+use_accumulate = true
+use_smooth_stroke = false
+use_plane_trim = false
+use_frontface = false
+curve_distance_falloff_preset = "CUSTOM"
+falloff_shape = "SPHERE"
+stroke_method = "SPACE"
+falloff = [[0.0, 1.0], [1.0, 0.769]]
+pressure_size_curve = [[0.0, 0.25], [1.0, 1.0]]
+pressure_strength_curve = [[0.0, 0.117], [1.0, 1.0]]
+
+# Jacob's pen tuning, 2026-10-07, copied from Blender with Copy Tuning.
+[brushes."Kingslien_Rake_V2"]
+strength = 0.3919
+spacing = 5
+hardness = 0.0
+auto_smooth_factor = 0.5
+normal_radius_factor = 1.2
+area_radius_factor = 0.5
+tip_roundness = 0.434
+tip_scale_x = 1.0
+crease_pinch_factor = 0.5
+plane_offset = 0.11
+plane_trim = 1.0
+texture_sample_bias = -0.0
+smooth_stroke_radius = 75
+smooth_stroke_factor = 0.9
+input_samples = 6
+normal_weight = 0.0
+use_pressure_size = true
+use_pressure_strength = true
+use_accumulate = true
+use_smooth_stroke = false
+use_plane_trim = true
+use_frontface = false
+curve_distance_falloff_preset = "CUSTOM"
+falloff_shape = "SPHERE"
+stroke_method = "SPACE"
+falloff = [[0.0, 1.0], [0.259, 0.91], [0.509, 0.782], [0.689, 0.644], [0.877, 0.362], [0.947, 0.125]]
+pressure_size_curve = [[0.0, 0.25], [1.0, 1.0]]
+pressure_strength_curve = [[0.0, 0.117], [1.0, 1.0]]

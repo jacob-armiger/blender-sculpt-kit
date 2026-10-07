@@ -24,12 +24,12 @@ All switches are in Preferences > Add-ons > Sculpt Kit.
 |---|---|
 | ZBrush navigation and keys | Sculpt Mode only: right-drag and empty-canvas navigation, Alt inverts, Ctrl masks, ZBrush hotkeys (S size, U strength, F frame, X symmetry, B brushes, D / Shift+D / Ctrl+D subdivision) |
 | ZBrush look | Colour theme (ZBrush or KlaySculpt style), ZBrush Layout button in the top bar, ZBrush-style brush bar and view switches, Subtools list, material (red wax, grey, brown clay). Each part has its own switch. As in ZBrush, the subtool you are working on stays in view: with its eye off, it hides when you pick another |
-| Move and rake brushes | Move that grabs through the whole model; Rake (5 teeth) and Fine Rake (10 teeth, needs a dense mesh) |
-| Kingslien brushes | Clay, Rake, Rake V2, HairTexture, Knife, KnifeSoft, ported from Ryan Kingslien's ZBrush brushes |
+| Move brush | Move that grabs through the whole model |
+| Kingslien brushes | Clay, Rake V2, HairTexture, Knife, KnifeSoft, ported from Ryan Kingslien's ZBrush brushes |
 | Synced reference view | Splits the viewport: reference on the left, sculpt on the right, both kept on the same view and the same frame, level with each other. Matching Edges dims whatever one half shows and the other does not, so the edge of the picture can be measured against like calipers |
 | New sculpt sphere | Dense quad sphere at 25 thousand to 1.5 million faces, in Sculpt Mode, viewport set up. Every sphere is the size of Blender's starting cube, 2 units across. The first goes to the centre of the scene and Blender's untouched starting cube is hidden to make room. One added to a sculpt goes on the surface in the middle of the view. The view only moves when it does not already show the sphere |
 | Remesh tools | Voxel Remesh by resolution on Ctrl+R; Quad Remesh that repairs the mesh first |
-| Brush tuning helper | Copy Tuning button that copies the active brush's settings |
+| Brush tuning helper | Copy Tuning copies the active brush's settings; Reset to Saved returns the brush to the settings in its library |
 
 The panels are in the 3D viewport sidebar (N), in the Sculpt Kit tab. The brushes are in the Sculpt Mode brush shelf.
 
@@ -74,5 +74,5 @@ Bump `version` in `sculpt_kit/blender_manifest.toml` before building a new relea
 - **A brush:** adjust it in Blender, press Copy Tuning in the Sculpt Kit tab, paste the block into `tuning/brushes.toml`, then build and install.
 - **Colours:** edit the `STYLES` table in `tools/build_theme.py`.
 - **Grey material:** edit the numbers at the top of `tools/build_matcap.py`.
-- **Rake teeth:** edit `RAKES` in `tools/build_assets.py`.
+- **Rake shape:** `rake_alpha` in `tools/kingslien.py`.
 - **Size of a new sphere:** the default of `radius` in `sculpt_kit/features/sculpt_session.py`.

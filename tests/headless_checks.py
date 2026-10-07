@@ -407,7 +407,7 @@ check("the cube is 25k quads, 2 units across, in Sculpt Mode", len(cube.data.pol
       and all(len(p.vertices) == 4 for p in cube.data.polygons) and all(abs(d - 2.0) < 1e-3 for d in cube.dimensions)
       and bpy.context.mode == 'SCULPT', (len(cube.data.polygons), tuple(cube.dimensions)))
 far = float(np.linalg.norm(corners, axis=1).max())
-check("its edges and corners are rounded off by a quarter of its half-width", abs(far - (0.75 * 3 ** 0.5 + 0.25)) < 1e-3
+check("its edges and corners are shaved off by a tenth of its half-width", abs(far - (0.9 * 3 ** 0.5 + 0.1)) < 1e-3
       and abs(float(np.abs(corners).max()) - 1.0) < 1e-5, far)
 check("its quads are all about the same size", edges.max() < 1.45 * edges.min(), (float(edges.min()), float(edges.max())))
 bpy.ops.sculptkit.new_sculpt(shape='CUBE', density='6', rounding=0.0, location=(9.0, 0.0, 0.0))

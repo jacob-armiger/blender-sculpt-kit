@@ -193,7 +193,8 @@ One added to a sculpt goes where you are looking, and the view stays put"""
     density: EnumProperty(name="Density", items=DENSITIES, default='8')
     radius: FloatProperty(name="Radius", default=1.0, min=0.001, subtype='DISTANCE', options={'SKIP_SAVE'},
                           description="Half the width of the shape")
-    rounding: FloatProperty(name="Rounding", default=0.25, min=0.0, max=1.0, subtype='FACTOR',
+    # Just enough to take the edges and corners off: a dead sharp edge gives brushes trouble.
+    rounding: FloatProperty(name="Rounding", default=0.1, min=0.0, max=1.0, subtype='FACTOR',
                             description="Cube only: how far its edges and corners are rounded off, "
                                         "from a sharp cube at 0 to a sphere at 1")
     location: FloatVectorProperty(name="Location", subtype='TRANSLATION', options={'SKIP_SAVE'})

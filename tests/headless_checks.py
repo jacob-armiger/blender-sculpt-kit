@@ -399,12 +399,26 @@ bpy.ops.sculptkit.new_sculpt(density='6')
 part = bpy.context.active_object
 check("one added to a sculpt is the same size", part != ob and bpy.context.mode == 'SCULPT' and ob.visible_get()
       and all(abs(d - 2.0) < 1e-3 for d in part.dimensions), tuple(part.dimensions))
+bpy.ops.sculptkit.new_sculpt(shape='CUBE', density='6', location=(6.0, 0.0, 0.0))
+cube = bpy.context.active_object
+corners = np.array([v.co for v in cube.data.vertices])
+edges = np.array([(cube.data.vertices[e.vertices[0]].co - cube.data.vertices[e.vertices[1]].co).length for e in cube.data.edges])
+check("the cube is 25k quads, 2 units across, in Sculpt Mode", len(cube.data.polygons) == 6 * 4 ** 6
+      and all(len(p.vertices) == 4 for p in cube.data.polygons) and all(abs(d - 2.0) < 1e-3 for d in cube.dimensions)
+      and bpy.context.mode == 'SCULPT', (len(cube.data.polygons), tuple(cube.dimensions)))
+far = float(np.linalg.norm(corners, axis=1).max())
+check("its edges and corners are rounded off by a quarter of its half-width", abs(far - (0.75 * 3 ** 0.5 + 0.25)) < 1e-3
+      and abs(float(np.abs(corners).max()) - 1.0) < 1e-5, far)
+check("its quads are all about the same size", edges.max() < 1.45 * edges.min(), (float(edges.min()), float(edges.max())))
+bpy.ops.sculptkit.new_sculpt(shape='CUBE', density='6', rounding=0.0, location=(9.0, 0.0, 0.0))
+sharp = bpy.context.active_object
+check("with no rounding it is a plain cube", abs(float(np.linalg.norm([v.co for v in sharp.data.vertices], axis=1).max()) - 3 ** 0.5) < 1e-4)
 bpy.ops.sculptkit.new_sculpt(density='6', radius=0.7, location=(3.0, 0.0, 0.0))
 given = bpy.context.active_object
 check("a radius and a location that are given are kept", all(abs(d - 1.4) < 1e-3 for d in given.dimensions)
       and tuple(given.location) == (3.0, 0.0, 0.0), (tuple(given.dimensions), tuple(given.location)))
 bpy.ops.object.mode_set(mode='OBJECT')
-for extra in (part, given):
+for extra in (part, given, cube, sharp):
     bpy.data.objects.remove(extra)
 ob.select_set(True)
 bpy.context.view_layer.objects.active = ob

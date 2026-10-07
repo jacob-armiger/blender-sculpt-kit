@@ -55,7 +55,7 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
                                         update=_feature_switch("kingslien_brushes"))
     use_reference_view: BoolProperty(name="Synced reference view", default=True,
                                      update=_feature_switch("reference_view"))
-    use_sculpt_session: BoolProperty(name="New sculpt sphere", default=True,
+    use_sculpt_session: BoolProperty(name="New sculpt sphere or cube", default=True,
                                      update=_feature_switch("sculpt_session"))
     use_remesh: BoolProperty(name="Remesh tools", default=True,
                              update=_feature_switch("remesh"))

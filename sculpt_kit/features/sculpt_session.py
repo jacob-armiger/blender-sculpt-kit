@@ -1,6 +1,7 @@
-"""New sculpt sphere: a dense, evenly quadded sphere, in Sculpt Mode, in a clean viewport.
+"""New sculpt: a dense, evenly quadded sphere or rounded cube, in Sculpt Mode, in a clean viewport.
 
-Every sphere is the size of Blender's starting cube: 2 units across.
+Either shape is the size of Blender's starting cube: 2 units across. What is
+said of the sphere below goes for the cube as well.
 
 The first one goes to the centre of the scene. Blender's starting cube, when it
 is the only mesh on screen and untouched, is hidden so that the sphere takes its
@@ -28,6 +29,55 @@ DENSITIES = (
     ('8', "400 Thousand Faces", "Dense: room for secondary forms"),
     ('9', "1.5 Million Faces", "Very dense: fine detail, slower to create"),
 )
+
+
+SHAPES = (
+    ('SPHERE', "Sphere", "A sphere of quads, all about the same size"),
+    ('CUBE', "Cube", "A cube with rounded edges and corners, of quads all about the same size"),
+)
+
+
+def _quad_cube(scene, levels, radius, rounding):
+    """A cube subdivided `levels` times into a flat grid on every side, with its edges and corners rounded off.
+
+    `rounding` is the radius of the rounding as a share of half the cube's width: 0 leaves a plain cube,
+    1 makes a sphere. `radius` is half the cube's width."""
+    import bmesh
+    cage = bpy.data.meshes.new("SculptKit Cage")
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=2.0)
+    bm.to_mesh(cage)
+    bm.free()
+
+    holder = bpy.data.objects.new("SculptKit Cage", cage)
+    scene.collection.objects.link(holder)
+    subdivide = holder.modifiers.new("Subdivide", 'SUBSURF')
+    subdivide.subdivision_type = 'SIMPLE'  # keeps the sides flat: every point stays on the cube
+    subdivide.levels = levels
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    mesh = bpy.data.meshes.new_from_object(holder.evaluated_get(depsgraph))
+    bpy.data.objects.remove(holder)
+    bpy.data.meshes.remove(cage)
+
+    co = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
+    mesh.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    if rounding > 0.0:
+        # Rounding an edge shortens the way round it: a band `rounding` wide becomes an arc of pi/4 times that.
+        # So the grid lines are first moved towards the edges, by as much as keeps them evenly spaced afterwards.
+        flat = 1.0 - rounding
+        along = np.abs(co) * (flat + rounding * np.pi / 4.0)
+        co = np.sign(co) * np.where(along <= flat, along, flat + (along - flat) / (np.pi / 4.0))
+        # Each point is held to a smaller cube inside, then pushed `rounding` out from it. Along an edge that
+        # sweeps a quarter circle. The tangent spaces the points evenly round it, where a straight push would
+        # crowd them towards the middle of the edge.
+        core = np.clip(co, -flat, flat)
+        out = rounding * np.tan((co - core) / rounding * (np.pi / 4.0))
+        co = core + rounding * out / np.linalg.norm(out, axis=1)[:, None]
+    mesh.vertices.foreach_set("co", (co * radius).ravel())
+    mesh.update()
+    mesh.shade_smooth()
+    return mesh
 
 
 def _quad_sphere(scene, levels, radius):
@@ -132,15 +182,20 @@ def _looking_at(context, shown):
 
 
 class SCULPTKIT_OT_new_sculpt(bpy.types.Operator):
-    """Add a dense quad sphere the size of Blender's starting cube and enter Sculpt Mode on it.
+    """Add a dense quad sphere or rounded cube the size of Blender's starting cube and enter Sculpt Mode on it.
 One added to a sculpt goes where you are looking, and the view stays put"""
     bl_idname = "sculptkit.new_sculpt"
-    bl_label = "New Sculpt Sphere"
+    bl_label = "New Sculpt"
     bl_options = {'REGISTER', 'UNDO'}
 
     # Location and framing are worked out afresh each time, unless they are given.
+    shape: EnumProperty(name="Shape", items=SHAPES, default='SPHERE', options={'SKIP_SAVE'})
     density: EnumProperty(name="Density", items=DENSITIES, default='8')
-    radius: FloatProperty(name="Radius", default=1.0, min=0.001, subtype='DISTANCE', options={'SKIP_SAVE'})
+    radius: FloatProperty(name="Radius", default=1.0, min=0.001, subtype='DISTANCE', options={'SKIP_SAVE'},
+                          description="Half the width of the shape")
+    rounding: FloatProperty(name="Rounding", default=0.25, min=0.0, max=1.0, subtype='FACTOR',
+                            description="Cube only: how far its edges and corners are rounded off, "
+                                        "from a sharp cube at 0 to a sphere at 1")
     location: FloatVectorProperty(name="Location", subtype='TRANSLATION', options={'SKIP_SAVE'})
     frame: BoolProperty(name="Frame It", default=True, options={'SKIP_SAVE'},
                         description="Move the view to the new sphere")
@@ -168,7 +223,10 @@ One added to a sculpt goes where you are looking, and the view stays put"""
         elif not given("frame") and space is not None:
             self.frame = not _in_view(context, Vector(self.location), self.radius)
 
-        mesh = _quad_sphere(context.scene, int(self.density), self.radius)
+        if self.shape == 'CUBE':
+            mesh = _quad_cube(context.scene, int(self.density), self.radius, self.rounding)
+        else:
+            mesh = _quad_sphere(context.scene, int(self.density), self.radius)
         mesh.name = "Sculpt"
         ob = bpy.data.objects.new("Sculpt", mesh)
         ob.location = self.location
@@ -201,7 +259,12 @@ class SCULPTKIT_PT_sculpt_session(bpy.types.Panel):
     def draw(self, _context):
         col = self.layout.column()
         for value, label, _description in DENSITIES:
-            col.operator(SCULPTKIT_OT_new_sculpt.bl_idname, text="Sphere, " + label, icon='MESH_UVSPHERE').density = value
+            col.label(text=label)
+            row = col.row(align=True)
+            for shape, name, icon in (('SPHERE', "Sphere", 'MESH_UVSPHERE'), ('CUBE', "Cube", 'MESH_CUBE')):
+                button = row.operator(SCULPTKIT_OT_new_sculpt.bl_idname, text=name, icon=icon)
+                button.shape = shape
+                button.density = value
 
 
 _classes = (SCULPTKIT_OT_new_sculpt, SCULPTKIT_PT_sculpt_session)

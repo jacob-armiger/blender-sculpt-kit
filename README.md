@@ -25,7 +25,7 @@ All switches are in Preferences > Add-ons > Sculpt Kit.
 | ZBrush navigation and keys | Sculpt Mode only: right-drag and empty-canvas navigation, Alt inverts, Ctrl masks, ZBrush hotkeys (S size, U strength, F frame, X symmetry, B brushes, D / Shift+D / Ctrl+D subdivision) |
 | ZBrush look | Colour theme (ZBrush or KlaySculpt style), ZBrush Layout button in the top bar, ZBrush-style brush bar and view switches, Subtools list, material (red wax, grey, brown clay). Each part has its own switch. As in ZBrush, the subtool you are working on stays in view: with its eye off, it hides when you pick another |
 | Move brush | Move that grabs through the whole model |
-| Kingslien brushes | Clay, Rake V2, HairTexture, Knife, KnifeSoft, ported from Ryan Kingslien's ZBrush brushes |
+| Kingslien brushes | Clay, Rake V2, HairTexture, Knife, KnifeSoft, ported from Ryan Kingslien's ZBrush brushes. Clay and Rake V2 are tuned with the pen against strokes made in ZBrush |
 | Synced reference view | Splits the viewport: reference on the left, sculpt on the right, both kept on the same view and the same frame, level with each other. Matching Edges dims whatever one half shows and the other does not, so the edge of the picture can be measured against like calipers |
 | New sculpt sphere | Dense quad sphere at 25 thousand to 1.5 million faces, in Sculpt Mode, viewport set up. Every sphere is the size of Blender's starting cube, 2 units across. The first goes to the centre of the scene and Blender's untouched starting cube is hidden to make room. One added to a sculpt goes on the surface in the middle of the view. The view only moves when it does not already show the sphere |
 | Remesh tools | Voxel Remesh by resolution on Ctrl+R; Quad Remesh that repairs the mesh first |
@@ -41,7 +41,7 @@ Run these from the project folder. They use `/Applications/Blender.app`; set `BL
 tools/build.sh
 ```
 
-Builds the brush libraries, colour themes and grey material, and writes the zip to `dist/`.
+Builds the brush libraries, colour themes and grey material, and writes the zip to `dist/`. It stops if any step fails.
 
 ```bash
 tests/run.sh
@@ -71,8 +71,9 @@ Bump `version` in `sculpt_kit/blender_manifest.toml` before building a new relea
 
 ## Tuning
 
-- **A brush:** adjust it in Blender, press Copy Tuning in the Sculpt Kit tab, paste the block into `tuning/brushes.toml`, then build and install.
+- **A brush:** adjust it in Blender, press Copy Tuning in the Sculpt Kit tab, paste the block into `tuning/brushes.toml` in place of any earlier block for that brush, then build and install. Copy before quitting Blender: changes to a brush last only for the session. Reset to Saved throws them away.
+- **Clay and Rake V2:** their blocks in `tuning/brushes.toml` are the pen tuning; the reasons for the settings underneath are in the comments in `tools/kingslien.py`.
 - **Colours:** edit the `STYLES` table in `tools/build_theme.py`.
 - **Grey material:** edit the numbers at the top of `tools/build_matcap.py`.
-- **Rake shape:** `rake_alpha` in `tools/kingslien.py`.
+- **Rake shape:** `rake_alpha` in `tools/kingslien.py`: `RAKE_NOTCHES` is where the tines meet, `RAKE_CROWN` how domed each tine is.
 - **Size of a new sphere:** the default of `radius` in `sculpt_kit/features/sculpt_session.py`.

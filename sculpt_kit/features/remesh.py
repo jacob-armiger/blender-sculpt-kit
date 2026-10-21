@@ -164,20 +164,15 @@ class SCULPTKIT_OT_quad_remesh(bpy.types.Operator):
 
     def execute(self, context):
         ob = context.active_object
-        mode = ob.mode
-        if mode != 'OBJECT':
-            bpy.ops.object.mode_set(mode='OBJECT')
         target = self.target_faces or context.scene.sculpt_kit_quad_faces
-
-        scale, repairs = prepare_for_quadriflow(ob.data)
-        try:
-            result = bpy.ops.object.quadriflow_remesh(
-                mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
-                use_preserve_sharp=self.preserve_sharp, smooth_normals=self.smooth_normals)
-        finally:
-            _scale_mesh(ob.data, 1.0 / scale)
-            if mode != 'OBJECT':
-                bpy.ops.object.mode_set(mode=mode)
+        with common.object_mode(context):
+            scale, repairs = prepare_for_quadriflow(ob.data)
+            try:
+                result = bpy.ops.object.quadriflow_remesh(
+                    mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
+                    use_preserve_sharp=self.preserve_sharp, smooth_normals=self.smooth_normals)
+            finally:
+                _scale_mesh(ob.data, 1.0 / scale)
 
         repaired = ", ".join("%d %s" % (count, what) for what, count in repairs.items())
         if 'FINISHED' not in result:
@@ -209,7 +204,7 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
         col.prop(scene, "sculpt_kit_remesh_resolution")
         col.operator(SCULPTKIT_OT_voxel_remesh.bl_idname, text="Voxel Remesh (Ctrl R)", icon='MOD_REMESH')
         col.separator()
-        col.prop(scene, "sculpt_kit_quad_faces")
+        col.prop(scene, "sculpt_kit_quad_faces", slider=True)  # a drag across it covers the whole usual range
         col.operator(SCULPTKIT_OT_quad_remesh.bl_idname, icon='MESH_GRID')
 
 
@@ -221,24 +216,19 @@ def enable():
         name="Resolution", default=128, min=8, soft_max=1024, max=4096,
         description="Voxels along the model's longest side for Voxel Remesh. Doubling it gives about four times the faces")
     bpy.types.Scene.sculpt_kit_quad_faces = IntProperty(
-        name="Quad Faces", default=5000, min=100, soft_max=500_000,
-        description="Roughly how many faces Quad Remesh aims for")
+        name="Quad Faces", default=5000, min=100, soft_max=100_000, max=2_000_000,
+        description="Roughly how many faces Quad Remesh aims for. Drag across for up to 100 thousand, "
+                    "Shift + drag for finer steps, or type a number for more")
     for cls in _classes:
         bpy.utils.register_class(cls)
-    keyconfig = bpy.context.window_manager.keyconfigs.addon
-    if keyconfig is not None:
+    keymap = common.sculpt_keymap()
+    if keymap is not None:
         # Takes over Blender's own Ctrl + R remesh, which uses the absolute voxel size.
-        keymap = keyconfig.keymaps.new(name="Sculpt", space_type='EMPTY', region_type='WINDOW')
         _added.append((keymap, keymap.keymap_items.new(SCULPTKIT_OT_voxel_remesh.bl_idname, 'R', 'PRESS', ctrl=True)))
 
 
 def disable():
-    for keymap, item in _added:
-        try:
-            keymap.keymap_items.remove(item)
-        except (RuntimeError, ReferenceError):
-            pass
-    _added.clear()
+    common.remove_keymap_items(_added)
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.sculpt_kit_remesh_resolution

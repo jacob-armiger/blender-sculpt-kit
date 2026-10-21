@@ -10,8 +10,6 @@ As in ZBrush, the mesh being worked on is always in view. Its eye can still be
 switched off: the mesh then goes into hiding as soon as another takes over, and
 comes back, eye still off, for as long as it is picked again.
 """
-from contextlib import contextmanager
-
 import bpy
 from bpy.app.handlers import persistent
 from bpy.props import BoolProperty, StringProperty
@@ -37,20 +35,6 @@ def _enter(mode):
         bpy.ops.object.mode_set(mode=mode)
     except (RuntimeError, TypeError):
         pass  # the object cannot be put in that mode
-
-
-@contextmanager
-def _object_mode(context):
-    """Object Mode for the length of the block, so that what was sculpted is in the mesh. Then back."""
-    ob = _active(context)
-    mode = ob.mode if ob is not None else 'OBJECT'
-    if mode != 'OBJECT':
-        bpy.ops.object.mode_set(mode='OBJECT')
-    try:
-        yield
-    finally:
-        if mode != 'OBJECT' and _active(context) is not None:
-            _enter(mode)
 
 
 def _show(ob):
@@ -173,7 +157,7 @@ class SCULPTKIT_OT_subtool_duplicate(_ActiveSubtool, bpy.types.Operator):
 
     def execute(self, context):
         ob = _active(context)
-        with _object_mode(context):
+        with common.object_mode(context):
             copy = ob.copy()
             copy.data = ob.data.copy()
             copy.pop(EYE_OFF, None)
@@ -196,7 +180,7 @@ class SCULPTKIT_OT_subtool_merge_down(_ActiveSubtool, bpy.types.Operator):
         ob = _active(context)
         listed = subtools(context)
         below = listed[listed.index(ob) + 1]
-        with _object_mode(context):
+        with common.object_mode(context):
             if not _show(below):
                 self.report({'WARNING'}, "%s is in a hidden collection" % below.name)
                 return {'CANCELLED'}

@@ -11,6 +11,10 @@ Whatever is done to the view in one half, the other follows. The focal length
 follows the sculpt half, adjusted for the sizes of the two halves so that the
 model is drawn at the same scale in both.
 
+The reference half's header, tool header and brush shelf stay, so that its
+canvas is the same height as the sculpt's, but they draw nothing: the only
+controls on screen are the sculpt half's.
+
 While the view is open, new objects go to the sculpt's side: Blender adds
 them to the active collection, so whenever that is the reference collection
 (clicking a reference in the Outliner makes it so), the collection of the
@@ -47,6 +51,7 @@ DIM = (0.0, 0.0, 0.0, 0.4)      # over what one half shows and the other does no
 EDGE = (1.0, 1.0, 1.0, 0.35)    # the line where that begins
 
 _halves_of = {}  # screen pointer -> (reference area pointer, sculpt area pointer)
+_blanked = []    # (class, attribute, what the class itself had there or None) while the reference's bars are blank
 _shown = {}      # screen pointer -> the view both halves were last brought to
 _handle = None
 _frame_handle = None
@@ -197,6 +202,50 @@ def _add_to_sculpt():
         else:
             layer = view_layer.layer_collection
         view_layer.active_layer_collection = layer
+
+
+def _in_reference_half(context):
+    screen, area = context.screen, context.area
+    if screen is None or area is None or not screen.get(MARK):
+        return False
+    halves = _halves(screen)
+    return halves is not None and area == halves[0]
+
+
+def _blank_bars():
+    """Make the reference half's header, tool header and brush shelf draw nothing. Blender looks these methods up
+    by name each time, so wrapping them on the class takes effect at once, and unwrapping undoes it."""
+    def blank_draw(cls):
+        functions = cls._dyn_ui_initialize()  # the list add-ons append to and swap in; it must stay the same list
+        drawn = cls.draw
+
+        def draw(self, context):
+            if not _in_reference_half(context):
+                drawn(self, context)
+        draw._draw_funcs = functions
+        return draw
+
+    def blank_assets(cls):
+        allowed = cls.asset_poll
+
+        def asset_poll(cls_, asset):
+            return not _in_reference_half(bpy.context) and allowed(asset)
+        return classmethod(asset_poll)
+
+    for cls, name, wrap in ((bpy.types.VIEW3D_HT_header, "draw", blank_draw),
+                            (bpy.types.VIEW3D_HT_tool_header, "draw", blank_draw),
+                            (bpy.types.VIEW3D_AST_brush_sculpt, "asset_poll", blank_assets)):
+        _blanked.append((cls, name, cls.__dict__.get(name)))
+        setattr(cls, name, wrap(cls))
+
+
+def _unblank_bars():
+    for cls, name, own in reversed(_blanked):
+        if own is None:
+            delattr(cls, name)
+        else:
+            setattr(cls, name, own)
+    _blanked.clear()
 
 
 # ------------------------------------------------------------ the same frame
@@ -499,6 +548,7 @@ def enable():
                     "same place in both: bring the reference up to it, then sculpt up to it")
     for cls in _classes:
         bpy.utils.register_class(cls)
+    _blank_bars()
     _handle = bpy.types.SpaceView3D.draw_handler_add(_keep_in_step, (), 'WINDOW', 'PRE_VIEW')
     _frame_handle = bpy.types.SpaceView3D.draw_handler_add(_draw_frame, (), 'WINDOW', 'POST_PIXEL')
 
@@ -509,6 +559,7 @@ def disable():
         if handle is not None:
             bpy.types.SpaceView3D.draw_handler_remove(handle, 'WINDOW')
     _handle = _frame_handle = None
+    _unblank_bars()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.sculpt_kit_reference_frame

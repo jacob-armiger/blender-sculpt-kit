@@ -81,18 +81,12 @@ class SCULPTKIT_OT_multires_finish(bpy.types.Operator):
     def execute(self, context):
         ob = context.active_object
         multires = _multires(ob)
-        mode = ob.mode
-        if mode != 'OBJECT':
-            bpy.ops.object.mode_set(mode='OBJECT')
-        try:
+        with common.object_mode(context):
             if self.action == 'APPLY':
                 multires.levels = multires.sculpt_levels  # applying takes the viewport level; make it the one shown
                 bpy.ops.object.modifier_apply(modifier=multires.name)
             else:
                 bpy.ops.object.modifier_remove(modifier=multires.name)
-        finally:
-            if mode != 'OBJECT':
-                bpy.ops.object.mode_set(mode=mode)
         return {'FINISHED'}
 
 
@@ -109,17 +103,11 @@ class SCULPTKIT_OT_subdivide_mesh(bpy.types.Operator):
 
     def execute(self, context):
         ob = context.active_object
-        mode = ob.mode
-        if mode != 'OBJECT':
-            bpy.ops.object.mode_set(mode='OBJECT')
-        try:
+        with common.object_mode(context):
             modifier = ob.modifiers.new("Sculpt Kit Subdivide", 'SUBSURF')
             modifier.levels = 1
             bpy.ops.object.modifier_move_to_index(modifier=modifier.name, index=0)  # before any mirror and the like
             bpy.ops.object.modifier_apply(modifier=modifier.name)
-        finally:
-            if mode != 'OBJECT':
-                bpy.ops.object.mode_set(mode=mode)
         self.report({'INFO'}, "Subdivided to {:,} faces".format(len(ob.data.polygons)))
         return {'FINISHED'}
 

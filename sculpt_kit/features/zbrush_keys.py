@@ -256,10 +256,9 @@ def _entries(prefs):
 
 
 def _add_keymap(prefs):
-    keyconfig = bpy.context.window_manager.keyconfigs.addon
-    if keyconfig is None:
+    keymap = common.sculpt_keymap()
+    if keymap is None:
         return
-    keymap = keyconfig.keymaps.new(name="Sculpt", space_type='EMPTY', region_type='WINDOW')
     # Blender puts each add-on item in front of the ones before it, so add them last-first.
     for operator, key, modifiers, properties in reversed(_entries(prefs)):
         item = keymap.keymap_items.new(operator, key, 'PRESS', ctrl="ctrl" in modifiers,
@@ -270,12 +269,7 @@ def _add_keymap(prefs):
 
 
 def _remove_keymap():
-    for keymap, item in _added:
-        try:
-            keymap.keymap_items.remove(item)
-        except (RuntimeError, ReferenceError):
-            pass
-    _added.clear()
+    common.remove_keymap_items(_added)
 
 
 def rebuild():

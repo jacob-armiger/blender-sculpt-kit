@@ -38,70 +38,17 @@ SHAPES = (
 )
 
 
-def _quad_cube(scene, levels, radius, rounding):
-    """A cube subdivided `levels` times into a flat grid on every side, with its edges and corners rounded off.
-
-    `rounding` is the radius of the rounding as a share of half the cube's width: 0 leaves a plain cube,
-    1 makes a sphere. `radius` is half the cube's width."""
+def _box_grid(xs, ys, zs):
+    """The surface of a box cut into a grid: lines across it at `xs`, `ys` and `zs`. Quads, facing out."""
     import bmesh
-    cage = bpy.data.meshes.new("SculptKit Cage")
-    bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=2.0)
-    bm.to_mesh(cage)
-    bm.free()
-
-    holder = bpy.data.objects.new("SculptKit Cage", cage)
-    scene.collection.objects.link(holder)
-    subdivide = holder.modifiers.new("Subdivide", 'SUBSURF')
-    subdivide.subdivision_type = 'SIMPLE'  # keeps the sides flat: every point stays on the cube
-    subdivide.levels = levels
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    mesh = bpy.data.meshes.new_from_object(holder.evaluated_get(depsgraph))
-    bpy.data.objects.remove(holder)
-    bpy.data.meshes.remove(cage)
-
-    co = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
-    mesh.vertices.foreach_get("co", co)
-    co = co.reshape(-1, 3)
-    if rounding > 0.0:
-        # Rounding an edge shortens the way round it: a band `rounding` wide becomes an arc of pi/4 times that.
-        # So the grid lines are first moved towards the edges, by as much as keeps them evenly spaced afterwards.
-        flat = 1.0 - rounding
-        along = np.abs(co) * (flat + rounding * np.pi / 4.0)
-        co = np.sign(co) * np.where(along <= flat, along, flat + (along - flat) / (np.pi / 4.0))
-        # Each point is held to a smaller cube inside, then pushed `rounding` out from it. Along an edge that
-        # sweeps a quarter circle. The tangent spaces the points evenly round it, where a straight push would
-        # crowd them towards the middle of the edge.
-        core = np.clip(co, -flat, flat)
-        out = rounding * np.tan((co - core) / rounding * (np.pi / 4.0))
-        co = core + rounding * out / np.linalg.norm(out, axis=1)[:, None]
-    mesh.vertices.foreach_set("co", (co * radius).ravel())
-    mesh.update()
-    mesh.shade_smooth()
-    return mesh
-
-
-def _quad_capsule(radius, length, around):
-    """An upright cylinder `length` tall with rounded ends of `radius`, of quads all about the same size.
-
-    Built as a box of grid lines with its long sides cut finer, then rounded the way the cube is with a rounding
-    as large as the box is thin: across, it becomes a circle, and its ends half spheres."""
-    import bmesh
-    n = around // 4  # grid squares along each side of the box's square cross-section
-    half = length / 2.0
-    body = max(1, round((length - 2.0 * radius) / (2.0 * np.pi * radius / around)))  # squares along the straight part
-    cap = n // 2  # rows of squares from the end of the straight part to the middle of an end
-    xs = np.linspace(-radius, radius, n + 1)
-    zs = np.concatenate([np.linspace(-half, -half + radius, cap + 1)[:-1],
-                         np.linspace(-half + radius, half - radius, body + 1),
-                         np.linspace(half - radius, half, cap + 1)[1:]])
-    size = (n, n, len(zs) - 1)
+    lines = (xs, ys, zs)
+    size = tuple(len(a) - 1 for a in lines)
     index, verts, faces = {}, [], []
 
     def vertex(key):
         if key not in index:
             index[key] = len(verts)
-            verts.append((xs[key[0]], xs[key[1]], zs[key[2]]))
+            verts.append(tuple(lines[a][key[a]] for a in range(3)))
         return index[key]
 
     for axis in range(3):  # each side of the box: a grid across the other two axes
@@ -122,18 +69,60 @@ def _quad_capsule(radius, length, around):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(mesh)
     bm.free()
+    return mesh
 
+
+def _round_off(mesh, inner, rounding):
+    """Hold each point to the box `inner` (half its size on each axis), then push it `rounding` out from there.
+
+    Along an edge that sweeps a quarter circle. The tangent spaces the points evenly round it, where a straight
+    push would crowd them towards the middle of the edge."""
     co = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
     mesh.vertices.foreach_get("co", co)
     co = co.reshape(-1, 3)
-    inner = np.array([0.0, 0.0, half - radius])
     core = np.clip(co, -inner, inner)
-    out = radius * np.tan((co - core) / radius * (np.pi / 4.0))  # spaced evenly round, as on the cube
-    co = core + radius * out / np.linalg.norm(out, axis=1)[:, None]
+    out = rounding * np.tan((co - core) / rounding * (np.pi / 4.0))
+    co = core + rounding * out / np.linalg.norm(out, axis=1)[:, None]
     mesh.vertices.foreach_set("co", co.ravel())
     mesh.update()
     mesh.shade_smooth()
     return mesh
+
+
+def _quad_cube(levels, radius, rounding):
+    """A cube cut `levels` times into a flat grid on every side, with its edges and corners rounded off.
+
+    `rounding` is the radius of the rounding as a share of half the cube's width: 0 leaves a plain cube,
+    1 makes a sphere. `radius` is half the cube's width."""
+    lines = np.linspace(-1.0, 1.0, 2 ** levels + 1)
+    if rounding > 0.0:
+        # Rounding an edge shortens the way round it: a band `rounding` wide becomes an arc of pi/4 times that.
+        # So the grid lines are first moved towards the edges, by as much as keeps them evenly spaced afterwards.
+        flat = 1.0 - rounding
+        along = np.abs(lines) * (flat + rounding * np.pi / 4.0)
+        lines = np.sign(lines) * np.where(along <= flat, along, flat + (along - flat) / (np.pi / 4.0))
+    lines = lines * radius
+    mesh = _box_grid(lines, lines, lines)
+    if rounding <= 0.0:
+        mesh.shade_smooth()
+        return mesh
+    return _round_off(mesh, np.full(3, (1.0 - rounding) * radius), rounding * radius)
+
+
+def _quad_capsule(radius, length, around):
+    """An upright cylinder `length` tall with rounded ends of `radius`, of quads all about the same size.
+
+    A box of grid lines with its long sides cut finer, rounded off the way the cube is with a rounding as large
+    as the box is thin: across, it becomes a circle, and its ends half spheres."""
+    n = around // 4  # grid squares along each side of the box's square cross-section
+    half = length / 2.0
+    body = max(1, round((length - 2.0 * radius) / (2.0 * np.pi * radius / around)))  # squares along the straight part
+    cap = n // 2  # rows of squares from the end of the straight part to the middle of an end
+    xs = np.linspace(-radius, radius, n + 1)
+    zs = np.concatenate([np.linspace(-half, -half + radius, cap + 1)[:-1],
+                         np.linspace(-half + radius, half - radius, body + 1),
+                         np.linspace(half - radius, half, cap + 1)[1:]])
+    return _round_off(_box_grid(xs, xs, zs), np.array([0.0, 0.0, half - radius]), radius)
 
 
 def _triangulate(mesh):
@@ -144,34 +133,6 @@ def _triangulate(mesh):
     bm.to_mesh(mesh)
     bm.free()
     mesh.shade_smooth()
-
-
-def _quad_sphere(scene, levels, radius):
-    """A cube subdivided `levels` times and pushed out to a sphere, so every face is a similar-sized quad."""
-    import bmesh
-    cage = bpy.data.meshes.new("SculptKit Cage")
-    bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=2.0)
-    bm.to_mesh(cage)
-    bm.free()
-
-    holder = bpy.data.objects.new("SculptKit Cage", cage)
-    scene.collection.objects.link(holder)
-    subdivide = holder.modifiers.new("Subdivide", 'SUBSURF')
-    subdivide.levels = levels
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    mesh = bpy.data.meshes.new_from_object(holder.evaluated_get(depsgraph))
-    bpy.data.objects.remove(holder)
-    bpy.data.meshes.remove(cage)
-
-    co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
-    mesh.vertices.foreach_get("co", co)
-    co = co.reshape(-1, 3)
-    co *= radius / np.linalg.norm(co, axis=1)[:, None]
-    mesh.vertices.foreach_set("co", co.ravel())
-    mesh.update()
-    mesh.shade_smooth()
-    return mesh
 
 
 def setup_view(space):
@@ -307,12 +268,10 @@ One added to a sculpt goes where you are looking, and the view stays put"""
         elif not given("frame") and space is not None:
             self.frame = not _in_view(context, Vector(self.location), reach)
 
-        if self.shape == 'CUBE':
-            mesh = _quad_cube(context.scene, LEVELS, self.radius, self.rounding)
-        elif self.shape == 'CYLINDER':
+        if self.shape == 'CYLINDER':
             mesh = _quad_capsule(self.radius, max(self.length, 2.0 * self.radius), CYLINDER_AROUND)
-        else:
-            mesh = _quad_sphere(context.scene, LEVELS, self.radius)
+        else:  # the sphere is the cube rounded all the way
+            mesh = _quad_cube(LEVELS, self.radius, self.rounding if self.shape == 'CUBE' else 1.0)
         if self.triangles:
             _triangulate(mesh)
         name = next(label for value, label, _description in SHAPES if value == self.shape)  # named after its shape

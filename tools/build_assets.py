@@ -59,7 +59,7 @@ def arrow_image():
     return np.where(shaft | head, 1.0, 0.0)
 
 
-def raked_strip(teeth=3, depth=0.6, groove=0.2, wall=0.015, centres=None, side=0.9, taper=0.0, size=512):
+def raked_strip(centres=(-0.3625, 0.3625), groove=0.375, depth=0.4, wall=0.015, taper=0.17, size=512):
     """The clay rake's alpha: a flat bar the width of the brush with evenly spaced grooves along it.
 
     On Clay Strips this lays a flat strip like Clay Strips' own, with shallow, wide grooves through it, so
@@ -68,25 +68,23 @@ def raked_strip(teeth=3, depth=0.6, groove=0.2, wall=0.015, centres=None, side=0
     strokes: flat strips, wide even grooves, nothing random. Measured at full pressure, in brush radii:
     the strip stands 0.18 high and each groove dips about a third of that.
 
-    The grooves are square-cut, `groove` wide with walls `wall` wide, and the strip's own sides are steep too,
-    so each ridge ends in a hard, square edge (asked for the same day). `centres` places the grooves by hand
-    instead of evenly along the bar, and `side` is where the bar's own sides start to fall away.
+    The grooves, centred at `centres`, are square-cut, `groove` wide with walls `wall` wide, and the strip's
+    own sides are steep too, so each ridge ends in a hard, square edge (asked for the same day).
 
     With `taper`, each spine narrows to a point towards the front and back of the pad (y is along the stroke
     when the texture follows it), so the spines taper off where a stroke starts and ends: past half way out,
     every groove and the bar's sides close in by up to `taper` on each side of a spine."""
     x = np.linspace(-1.0, 1.0, size)[None, :]
     y = np.linspace(-1.0, 1.0, size)[:, None]
-    pitch = 1.8 / (teeth + 1)
     def fade(v, start, end):
         t = np.clip((end - np.abs(v)) / (end - start), 0.0, 1.0)
         return t * t * (3.0 - 2.0 * t)
 
     closing = taper * np.clip((np.abs(y) - 0.5) / 0.48, 0.0, 1.0)
     cut = np.zeros((size, size))
-    for centre in centres or [-0.9 + (k + 1) * pitch for k in range(teeth)]:
+    for centre in centres:
         cut = np.maximum(cut, fade(x - centre, groove / 2 - wall + closing, groove / 2 + wall + closing))
-    return fade(x, side - closing, 0.97 - closing) * fade(y, 0.75, 0.98) * (1.0 - depth * cut)
+    return fade(x, 0.9 - closing, 0.97 - closing) * fade(y, 0.75, 0.98) * (1.0 - depth * cut)
 
 
 def as_asset(brush, description):
@@ -174,7 +172,7 @@ def build_kit(tuning):
     # (four square spines; three tapered spines) were dropped the same day, which is why this one is V3:
     # three thin spines with square sides and wide, shallow grooves. The strip keeps the brush's width.
     # The spines' ends taper to points, so they thin out where a stroke starts and ends (asked for 22 October).
-    pad = raked_strip(depth=0.4, groove=0.375, centres=(-0.3625, 0.3625), taper=0.17)
+    pad = raked_strip()
     clay_rake.name = "SculptKit_Clay_Rake_V3"
     as_asset(clay_rake, "Lays flat strips of clay like Clay Strips, with three thin, square-cut spines and wide, shallow grooves")
     clay_rake.tip_roundness = 0.4

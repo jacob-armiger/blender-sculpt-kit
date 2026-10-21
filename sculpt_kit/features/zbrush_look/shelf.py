@@ -211,9 +211,8 @@ def enable(by_user=False):
     for cls in _classes:
         bpy.utils.register_class(cls)
     bpy.types.VIEW3D_HT_header.append(_view_switches)
-    keyconfig = bpy.context.window_manager.keyconfigs.addon
-    if keyconfig is not None:
-        keymap = keyconfig.keymaps.new("Sculpt", space_type='EMPTY')
+    keymap = common.sculpt_keymap()
+    if keymap is not None:
         for key, value in [('MOUSEMOVE', 'ANY')] + [(k, v) for k in _MODIFIER_KEYS for v in ('PRESS', 'RELEASE')]:
             _keymap_items.append((keymap, keymap.keymap_items.new(
                 SCULPTKIT_OT_watch_modifiers.bl_idname, key, value, any=True)))
@@ -227,12 +226,7 @@ def disable(restore=True):
         functions[functions.index(_shelf)] = _blender_draw
     _blender_draw = None
     bpy.types.VIEW3D_HT_header.remove(_view_switches)
-    for keymap, item in _keymap_items:
-        try:
-            keymap.keymap_items.remove(item)
-        except (ReferenceError, RuntimeError):
-            pass
-    _keymap_items.clear()
+    common.remove_keymap_items(_keymap_items)
     _held.clear()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)

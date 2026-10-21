@@ -1,4 +1,5 @@
 import sys
+from contextlib import contextmanager
 
 import bpy
 
@@ -47,3 +48,37 @@ def redraw_all():
     for window in bpy.context.window_manager.windows:
         for area in window.screen.areas:
             area.tag_redraw()
+
+
+@contextmanager
+def object_mode(context):
+    """Object Mode for the length of the block, for operators that need it and so that what was sculpted is in
+    the mesh. Then back to the mode before, if the active object can still take it."""
+    ob = context.view_layer.objects.active
+    mode = ob.mode if ob is not None else 'OBJECT'
+    if mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+    try:
+        yield
+    finally:
+        if mode != 'OBJECT' and context.view_layer.objects.active is not None:
+            try:
+                bpy.ops.object.mode_set(mode=mode)
+            except (RuntimeError, TypeError):
+                pass  # the object cannot be put in that mode
+
+
+def sculpt_keymap():
+    """The add-on Sculpt Mode keymap, or None when Blender runs without one (in the background)."""
+    keyconfig = bpy.context.window_manager.keyconfigs.addon
+    return None if keyconfig is None else keyconfig.keymaps.new(name="Sculpt", space_type='EMPTY', region_type='WINDOW')
+
+
+def remove_keymap_items(added):
+    """Take away the (keymap, item) pairs a feature added, and empty the list."""
+    for keymap, item in added:
+        try:
+            keymap.keymap_items.remove(item)
+        except (RuntimeError, ReferenceError):
+            pass  # already gone with its keymap
+    added.clear()

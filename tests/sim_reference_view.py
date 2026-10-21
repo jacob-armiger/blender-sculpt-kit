@@ -27,9 +27,10 @@ def test(sim):
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
     with sim.override():
-        bpy.ops.sculptkit.new_sculpt(density='6', frame=True)
+        bpy.ops.sculptkit.new_sculpt(frame=True)
     yield 0.8
     sculpt_ob = bpy.context.active_object
+    sculpt_name = sculpt_ob.name
     scene = bpy.context.scene
 
     # Something to look at in the reference view.
@@ -71,6 +72,36 @@ def test(sim):
     sim.check("the reference is on the left, alone", shown(cube, sim.space(left)) and not shown(sculpt_ob, sim.space(left)))
     sim.check("the sculpt is on the right, without the reference",
               shown(sculpt_ob, sim.space(right)) and not shown(cube, sim.space(right)))
+    active_collection = bpy.context.view_layer.active_layer_collection.collection
+    sim.check("new objects go to the sculpt's side, not into the reference collection",
+              active_collection != bpy.context.scene.sculpt_kit_reference, active_collection.name)
+    # Clicking a reference in the Outliner makes the reference collection the one new objects go to.
+    for layer in bpy.context.view_layer.layer_collection.children:
+        if layer.collection == bpy.context.scene.sculpt_kit_reference:
+            bpy.context.view_layer.active_layer_collection = layer
+    for area in areas:
+        area.tag_redraw()
+    yield 0.5
+    sim.check("while the view is open, the reference collection does not stay the one new objects go to",
+              bpy.context.view_layer.active_layer_collection.collection != bpy.context.scene.sculpt_kit_reference,
+              bpy.context.view_layer.active_layer_collection.collection.name)
+    with sim.override(right):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.mesh.primitive_ico_sphere_add(radius=0.2, location=(2.0, 0.0, 0.0))
+    added = bpy.context.active_object
+    sim.check("(the added object is the new one)", added.name.startswith("Icosphere"), added.name)
+    yield 0.3
+    sim.check("one added with Blender's Add menu shows on the sculpt's side", shown(added, sim.space(right))
+              and not shown(added, sim.space(left)), [c.name for c in added.users_collection])
+    added_mesh = added.data
+    bpy.data.objects.remove(added)
+    bpy.data.meshes.remove(added_mesh)
+    sculpt_ob, cube = bpy.data.objects[sculpt_name], bpy.data.objects["RefCube"]
+    sculpt_ob.select_set(True)
+    bpy.context.view_layer.objects.active = sculpt_ob
+    with sim.override(right):
+        bpy.ops.object.mode_set(mode='SCULPT')
+    yield 0.3
     panels = (sim.space(right).show_region_ui, sim.space(right).show_region_toolbar)
     sim.check("the viewport you were working in stays the sculpt's, panels and overlays as they were",
               right.as_pointer() == original and panels == panels_before and sim.space(right).overlay.show_overlays,
@@ -152,7 +183,7 @@ def test(sim):
     yield from sim.drag(sim.at(0.9, 0.88, right), sim.at(0.84, 0.8, right), button='RIGHTMOUSE')
     yield 0.3
     yield from sim.undo()
-    sculpt_ob, cube = bpy.data.objects["Sculpt"], bpy.data.objects["RefCube"]  # undo can replace the objects
+    sculpt_ob, cube = bpy.data.objects[sculpt_name], bpy.data.objects["RefCube"]  # undo can replace the objects
     sim.check("undo takes back the stroke, not the turn of the view that came after it",
               close(sim.positions(sculpt_ob), before, 1e-6) and together(left, right))
 

@@ -2,7 +2,9 @@
 
 Click a name to work on that mesh: the mode you are in moves over to it, so in
 Sculpt Mode you carry on sculpting. The eye hides or shows a mesh. Duplicate,
-Merge Down and Delete act on the active one.
+Merge Down and Delete act on the active one, and the arrows move it up or down
+the list. The list keeps the order it is given; meshes that have not been
+moved yet follow, by name.
 
 As in ZBrush, the mesh being worked on is always in view. Its eye can still be
 switched off: the mesh then goes into hiding as soon as another takes over, and
@@ -17,11 +19,13 @@ from bpy.props import BoolProperty, StringProperty
 from ... import common
 
 EYE_OFF = "sculpt_kit_eye_off"  # on the mesh being worked on while its eye is off
+ORDER = "sculpt_kit_order"  # a mesh's place in the list, once it has been moved; a copy takes its original's
 
 
 def subtools(context):
     """The view layer's meshes, in the order the list shows them."""
-    return sorted((ob for ob in context.view_layer.objects if ob.type == 'MESH'), key=lambda ob: ob.name.lower())
+    meshes = (ob for ob in context.view_layer.objects if ob.type == 'MESH')
+    return sorted(meshes, key=lambda ob: (ORDER not in ob, ob.get(ORDER, 0), ob.name.lower()))
 
 
 def _active(context):
@@ -205,6 +209,31 @@ class SCULPTKIT_OT_subtool_merge_down(_ActiveSubtool, bpy.types.Operator):
         return {'FINISHED'}
 
 
+class SCULPTKIT_OT_subtool_move(_ActiveSubtool, bpy.types.Operator):
+    """Move the active mesh up or down the list"""
+    bl_idname = "sculptkit.subtool_move"
+    bl_label = "Move Subtool"
+    bl_options = {'UNDO'}
+
+    direction: bpy.props.EnumProperty(items=(('UP', "Up", "Move it up the list"),
+                                             ('DOWN', "Down", "Move it down the list")))
+
+    @classmethod
+    def description(cls, context, properties):
+        return "Move the active mesh %s the list" % properties.direction.lower()
+
+    def execute(self, context):
+        listed = subtools(context)
+        index = listed.index(_active(context))
+        other = index - 1 if self.direction == 'UP' else index + 1
+        if not 0 <= other < len(listed):
+            return {'CANCELLED'}
+        listed[index], listed[other] = listed[other], listed[index]
+        for place, ob in enumerate(listed):  # from now on every mesh keeps its place
+            ob[ORDER] = place
+        return {'FINISHED'}
+
+
 class SCULPTKIT_OT_subtool_delete(_ActiveSubtool, bpy.types.Operator):
     """Delete the active mesh. The next one in the list takes over"""
     bl_idname = "sculptkit.subtool_delete"
@@ -255,7 +284,15 @@ class SCULPTKIT_PT_subtools(bpy.types.Panel):
                          icon='HIDE_ON' if eye_off(ob, current) else 'HIDE_OFF').name = ob.name
         if current is not None and current.type == 'MESH':
             col = layout.column(align=True)
-            col.prop(current, "name", text="")
+            row = col.row(align=True)
+            row.prop(current, "name", text="")
+            first, last = listed.index(current) == 0, listed.index(current) == len(listed) - 1
+            sub = row.row(align=True)
+            sub.enabled = not first
+            sub.operator(SCULPTKIT_OT_subtool_move.bl_idname, text="", icon='TRIA_UP').direction = 'UP'
+            sub = row.row(align=True)
+            sub.enabled = not last
+            sub.operator(SCULPTKIT_OT_subtool_move.bl_idname, text="", icon='TRIA_DOWN').direction = 'DOWN'
             row = col.row(align=True)
             row.operator(SCULPTKIT_OT_subtool_duplicate.bl_idname, text="Duplicate")
             row.operator(SCULPTKIT_OT_subtool_merge_down.bl_idname, text="Merge Down")
@@ -263,7 +300,8 @@ class SCULPTKIT_PT_subtools(bpy.types.Panel):
 
 
 _classes = (SCULPTKIT_OT_subtool_select, SCULPTKIT_OT_subtool_show, SCULPTKIT_OT_subtool_duplicate,
-            SCULPTKIT_OT_subtool_merge_down, SCULPTKIT_OT_subtool_delete, SCULPTKIT_PT_subtools)
+            SCULPTKIT_OT_subtool_merge_down, SCULPTKIT_OT_subtool_move, SCULPTKIT_OT_subtool_delete,
+            SCULPTKIT_PT_subtools)
 
 
 # Blender has ways of its own to move on to another mesh: a click in Object Mode, Transfer Mode, the Outliner.

@@ -195,7 +195,8 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = common.PANEL_CATEGORY
-    bl_order = 3
+    bl_order = 4
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):

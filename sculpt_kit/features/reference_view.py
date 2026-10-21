@@ -11,6 +11,11 @@ Whatever is done to the view in one half, the other follows. The focal length
 follows the sculpt half, adjusted for the sizes of the two halves so that the
 model is drawn at the same scale in both.
 
+While the view is open, new objects go to the sculpt's side: Blender adds
+them to the active collection, so whenever that is the reference collection
+(clicking a reference in the Outliner makes it so), the collection of the
+mesh being worked on, or else the scene's own, takes its place.
+
 The halves are also kept to the same frame, so that the edge of the picture
 can be measured against like a pair of calipers: bring the reference up to an
 edge, then sculpt up to the same edge. The view opens with both canvases the
@@ -152,6 +157,8 @@ def _keep_in_step():
         return
     reference_area, sculpt_area = halves
     _match_scale(reference_area, sculpt_area)
+    if _adds_to_reference(context.view_layer, context.scene) and not bpy.app.timers.is_registered(_add_to_sculpt):
+        bpy.app.timers.register(_add_to_sculpt, first_interval=0.0)  # not while drawing
     key = screen.as_pointer()
     view = _view(area.spaces.active)
     if key in _shown and _same(view, _shown[key]):
@@ -161,6 +168,35 @@ def _keep_in_step():
     if not _same(_view(other.spaces.active), view):
         _show(other.spaces.active, view)
         other.tag_redraw()
+
+
+def _reference_branch(scene):
+    reference = scene.sculpt_kit_reference
+    return set() if reference is None else {reference, *reference.children_recursive}
+
+
+def _adds_to_reference(view_layer, scene):
+    return view_layer.active_layer_collection.collection in _reference_branch(scene)
+
+
+def _add_to_sculpt():
+    """Make new objects go to the sculpt's side of every open reference view."""
+    for window in bpy.context.window_manager.windows:
+        view_layer, scene = window.view_layer, window.scene
+        if not window.screen.get(MARK) or not _adds_to_reference(view_layer, scene):
+            continue
+        reference = _reference_branch(scene)
+        active = view_layer.objects.active
+        wanted = next((c for c in (active.users_collection if active else ()) if c not in reference), None)
+        layers = [view_layer.layer_collection]
+        while layers:
+            layer = layers.pop()
+            if layer.collection == wanted:
+                break
+            layers.extend(layer.children)
+        else:
+            layer = view_layer.layer_collection
+        view_layer.active_layer_collection = layer
 
 
 # ------------------------------------------------------------ the same frame
@@ -436,7 +472,7 @@ class SCULPTKIT_PT_reference_view(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = common.PANEL_CATEGORY
-    bl_order = 1
+    bl_order = 2
 
     def draw(self, context):
         col = self.layout.column()

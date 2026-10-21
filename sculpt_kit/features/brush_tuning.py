@@ -60,6 +60,7 @@ class SCULPTKIT_PT_brush_tuning(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_category = common.PANEL_CATEGORY
     bl_order = 5
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):

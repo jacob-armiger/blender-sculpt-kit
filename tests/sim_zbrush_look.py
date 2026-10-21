@@ -72,7 +72,7 @@ def test(sim):
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
     with sim.override():
-        bpy.ops.sculptkit.new_sculpt(density='6', frame=True)
+        bpy.ops.sculptkit.new_sculpt(frame=True)
     yield 1.0
     sim.check("the brush bar is the ZBrush shelf", look.shelf.in_place())
     sim.check("the viewport header has the view switches and the material picker",
@@ -143,7 +143,7 @@ def test(sim):
         return bpy.context.active_object.name, bpy.context.mode
 
     first = bpy.context.active_object.name
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6', radius=0.5, location=(0.0, 0.0, 0.0))
+    sim.call(bpy.ops.sculptkit.new_sculpt, radius=0.5, location=(0.0, 0.0, 0.0))
     yield 0.8
     second = bpy.context.active_object.name
     sim.check("a second sculpt joins the subtool list", meshes() == sorted([first, second]), meshes())
@@ -248,6 +248,33 @@ def test(sim):
     yield from sim.undo()
     sim.check("and can be undone too", meshes() == sorted([first, second, copy]) and active() == (first, 'SCULPT'),
               (meshes(), active()))
+
+    def order():
+        return [ob.name for ob in look.subtools.subtools(bpy.context)]
+    sim.check("the list starts in order of name", order() == [first, second, copy], order())
+    sim.call(bpy.ops.sculptkit.subtool_move, direction='DOWN')
+    yield 0.3
+    sim.check("the down arrow moves the active subtool down the list", order() == [second, first, copy]
+              and active() == (first, 'SCULPT'), order())
+    sim.call(bpy.ops.sculptkit.subtool_move, direction='DOWN')
+    yield 0.3
+    sim.check("and further down", order() == [second, copy, first], order())
+    sim.check("not past the bottom", not bpy.ops.sculptkit.subtool_move('EXEC_DEFAULT', direction='DOWN') == {'FINISHED'})
+    sim.call(bpy.ops.sculptkit.subtool_select, name=second)
+    yield 0.5
+    sim.call(bpy.ops.sculptkit.subtool_merge_down)
+    yield 0.5
+    sim.check("Merge Down follows the order given", sorted(meshes()) == sorted([second, first])
+              and order() == [second, first], order())
+    yield from sim.undo()
+    yield from sim.undo()
+    sim.check("undo puts the subtool back where it was", order() == [second, copy, first], order())
+    sim.call(bpy.ops.sculptkit.subtool_select, name=first)
+    yield 0.5
+    sim.call(bpy.ops.sculptkit.subtool_move, direction='UP')
+    sim.call(bpy.ops.sculptkit.subtool_move, direction='UP')
+    yield 0.3
+    sim.check("the up arrow moves it back to the top", order() == [first, second, copy], order())
     before = sim.positions()
     centre = sim.project((0.0, 0.0, 0.0))
     yield from sim.drag(centre, (centre[0] - 50, centre[1] + 40))

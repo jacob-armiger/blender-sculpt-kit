@@ -123,7 +123,8 @@ def build_kit(tuning):
     move.name = "SculptKit_Move"
     move.falloff_shape = 'PROJECTED'
     move.strength = 0.8
-    as_asset(move, "Moves everything under the brush, front and back, like ZBrush's Move")
+    as_asset(move, "Moves everything under the brush, front and back. "
+                   "Good for pulling out limbs and other forms, and for big changes of shape")
     set_preview(move, arrow_image())
     tune(move, tuning)
 
@@ -191,8 +192,13 @@ def build_kit(tuning):
 
     # Plain copies of Blender's Clay Strips and Clay, so they sit with the kit's brushes and can be retuned
     # without touching Blender's own. Clay is named Clay Soft at Jacob's request.
-    for base, name, description in ((clay_strips, "SculptKit_Clay_Strips_Copy", "A copy of Blender's Clay Strips"),
-                                    (clay, "SculptKit_Clay_Soft", "A copy of Blender's Clay brush")):
+    for base, name, description in (
+            (clay_strips, "SculptKit_Clay_Strips_Copy",
+             "Lays flat, square-edged strips of clay that build up in layers. Good for blocking in planes "
+             "and muscle masses.\nA copy of Blender's Clay Strips"),
+            (clay, "SculptKit_Clay_Soft",
+             "Builds soft, rounded volume quickly. Good for bulking out masses and filling in between forms.\n"
+             "A copy of Blender's Clay brush")):
         brush = base.copy()
         brush.name = name
         as_asset(brush, description)
@@ -204,7 +210,8 @@ def build_kit(tuning):
         dst.brushes = ["Kingslien_Clay"]
     sk_clay = dst.brushes[0]
     sk_clay.name = "SculptKit_Clay"
-    as_asset(sk_clay, "Round clay buildup brush, a copy of Kingslien_Clay as tuned with the pen. Ctrl to carve.")
+    as_asset(sk_clay, "Round clay brush that lays flat-topped strokes and covers what is under them. Good for "
+                      "building up and blocking in forms")
     kingslien.set_preview(sk_clay, kingslien.alpha_array(kingslien.load_zbp("Kingslien_Clay")))
     tune(sk_clay, tuning)
 

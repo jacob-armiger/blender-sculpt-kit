@@ -1,7 +1,10 @@
-"""New sculpt: a dense, evenly quadded sphere or rounded cube, in Sculpt Mode, in a clean viewport.
+"""New sculpt: an evenly meshed sphere, rounded cube or thin cylinder, in Sculpt Mode, in a clean viewport.
 
-Either shape is the size of Blender's starting cube: 2 units across. What is
-said of the sphere below goes for the cube as well.
+Every shape has about 25 thousand faces' worth of detail (Divide adds more), of
+quads or, if picked, triangles. The sphere and cube are the size of Blender's
+starting cube: 2 units across. The cylinder is as tall, and thin, with rounded
+ends, for laying out an armature for a figure. What is said of the sphere below
+goes for the others as well.
 
 The first one goes to the centre of the scene. Blender's starting cube, when it
 is the only mesh on screen and untouched, is hidden so that the sphere takes its
@@ -22,18 +25,16 @@ from .. import common
 # The view is left alone when it shows the new sphere between these sizes, as fractions of the viewport's shorter side.
 SMALLEST, LARGEST = 0.05, 1.0
 
-# A cube subdivided n times has 6 * 4^n faces.
-DENSITIES = (
-    ('6', "25 Thousand Faces", "Light: for blocking out big forms"),
-    ('7', "100 Thousand Faces", "Medium"),
-    ('8', "400 Thousand Faces", "Dense: room for secondary forms"),
-    ('9', "1.5 Million Faces", "Very dense: fine detail, slower to create"),
-)
+# A cube subdivided n times has 6 * 4^n faces: 6 gives about 25 thousand. Divide adds detail from there.
+LEVELS = 6
+# The cylinder's faces are about the size of the sphere's: its circumference is cut into this many.
+CYLINDER_AROUND = 48
 
 
 SHAPES = (
     ('SPHERE', "Sphere", "A sphere of quads, all about the same size"),
     ('CUBE', "Cube", "A cube with rounded edges and corners, of quads all about the same size"),
+    ('CYLINDER', "Cylinder", "A thin upright cylinder with rounded ends, for laying out an armature"),
 )
 
 
@@ -78,6 +79,71 @@ def _quad_cube(scene, levels, radius, rounding):
     mesh.update()
     mesh.shade_smooth()
     return mesh
+
+
+def _quad_capsule(radius, length, around):
+    """An upright cylinder `length` tall with rounded ends of `radius`, of quads all about the same size.
+
+    Built as a box of grid lines with its long sides cut finer, then rounded the way the cube is with a rounding
+    as large as the box is thin: across, it becomes a circle, and its ends half spheres."""
+    import bmesh
+    n = around // 4  # grid squares along each side of the box's square cross-section
+    half = length / 2.0
+    body = max(1, round((length - 2.0 * radius) / (2.0 * np.pi * radius / around)))  # squares along the straight part
+    cap = n // 2  # rows of squares from the end of the straight part to the middle of an end
+    xs = np.linspace(-radius, radius, n + 1)
+    zs = np.concatenate([np.linspace(-half, -half + radius, cap + 1)[:-1],
+                         np.linspace(-half + radius, half - radius, body + 1),
+                         np.linspace(half - radius, half, cap + 1)[1:]])
+    size = (n, n, len(zs) - 1)
+    index, verts, faces = {}, [], []
+
+    def vertex(key):
+        if key not in index:
+            index[key] = len(verts)
+            verts.append((xs[key[0]], xs[key[1]], zs[key[2]]))
+        return index[key]
+
+    for axis in range(3):  # each side of the box: a grid across the other two axes
+        b, c = [a for a in range(3) if a != axis]
+        for end in (0, size[axis]):
+            for u in range(size[b]):
+                for v in range(size[c]):
+                    corners = []
+                    for du, dv in ((0, 0), (1, 0), (1, 1), (0, 1)):
+                        key = [0, 0, 0]
+                        key[axis], key[b], key[c] = end, u + du, v + dv
+                        corners.append(vertex(tuple(key)))
+                    faces.append(corners)
+    mesh = bpy.data.meshes.new("Sculpt")
+    mesh.from_pydata(verts, [], faces)
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+
+    co = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
+    mesh.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    inner = np.array([0.0, 0.0, half - radius])
+    core = np.clip(co, -inner, inner)
+    out = radius * np.tan((co - core) / radius * (np.pi / 4.0))  # spaced evenly round, as on the cube
+    co = core + radius * out / np.linalg.norm(out, axis=1)[:, None]
+    mesh.vertices.foreach_set("co", co.ravel())
+    mesh.update()
+    mesh.shade_smooth()
+    return mesh
+
+
+def _triangulate(mesh):
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='BEAUTY')
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.shade_smooth()
 
 
 def _quad_sphere(scene, levels, radius):
@@ -182,7 +248,7 @@ def _looking_at(context, shown):
 
 
 class SCULPTKIT_OT_new_sculpt(bpy.types.Operator):
-    """Add a dense quad sphere or rounded cube the size of Blender's starting cube and enter Sculpt Mode on it.
+    """Add a sphere, rounded cube or thin cylinder of about 25 thousand faces and enter Sculpt Mode on it.
 One added to a sculpt goes where you are looking, and the view stays put"""
     bl_idname = "sculptkit.new_sculpt"
     bl_label = "New Sculpt"
@@ -190,9 +256,12 @@ One added to a sculpt goes where you are looking, and the view stays put"""
 
     # Location and framing are worked out afresh each time, unless they are given.
     shape: EnumProperty(name="Shape", items=SHAPES, default='SPHERE', options={'SKIP_SAVE'})
-    density: EnumProperty(name="Density", items=DENSITIES, default='8')
+    triangles: BoolProperty(name="Triangles", default=False,
+                            description="Made of triangles instead of quads. Divide works best on quads")
     radius: FloatProperty(name="Radius", default=1.0, min=0.001, subtype='DISTANCE', options={'SKIP_SAVE'},
-                          description="Half the width of the shape")
+                          description="Half the width of the shape. The cylinder starts at 0.1")
+    length: FloatProperty(name="Length", default=2.0, min=0.01, subtype='DISTANCE',
+                          description="Cylinder only: its height, rounded ends included")
     # Just enough to take the edges and corners off: a dead sharp edge gives brushes trouble.
     rounding: FloatProperty(name="Rounding", default=0.1, min=0.0, max=1.0, subtype='FACTOR',
                             description="Cube only: how far its edges and corners are rounded off, "
@@ -223,6 +292,10 @@ One added to a sculpt goes where you are looking, and the view stays put"""
         space = _viewport(context)
         given = self.properties.is_property_set
 
+        if self.shape == 'CYLINDER' and not given("radius"):
+            self.radius = 0.1
+        reach = max(self.radius, self.length / 2.0) if self.shape == 'CYLINDER' else self.radius
+
         shown = _on_screen(context)
         if self.hide_cube and len(shown) == 1 and _is_starting_cube(shown[0]):
             shown.pop().hide_set(True)
@@ -232,14 +305,19 @@ One added to a sculpt goes where you are looking, and the view stays put"""
             if not given("frame"):
                 self.frame = False
         elif not given("frame") and space is not None:
-            self.frame = not _in_view(context, Vector(self.location), self.radius)
+            self.frame = not _in_view(context, Vector(self.location), reach)
 
         if self.shape == 'CUBE':
-            mesh = _quad_cube(context.scene, int(self.density), self.radius, self.rounding)
+            mesh = _quad_cube(context.scene, LEVELS, self.radius, self.rounding)
+        elif self.shape == 'CYLINDER':
+            mesh = _quad_capsule(self.radius, max(self.length, 2.0 * self.radius), CYLINDER_AROUND)
         else:
-            mesh = _quad_sphere(context.scene, int(self.density), self.radius)
-        mesh.name = "Sculpt"
-        ob = bpy.data.objects.new("Sculpt", mesh)
+            mesh = _quad_sphere(context.scene, LEVELS, self.radius)
+        if self.triangles:
+            _triangulate(mesh)
+        name = next(label for value, label, _description in SHAPES if value == self.shape)  # named after its shape
+        mesh.name = name
+        ob = bpy.data.objects.new(name, mesh)
         self.made = ob.name
         ob.location = self.location
         context.collection.objects.link(ob)
@@ -266,23 +344,27 @@ class SCULPTKIT_PT_sculpt_session(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = common.PANEL_CATEGORY
-    bl_order = 2
+    bl_order = 3
 
-    def draw(self, _context):
+    def draw(self, context):
         col = self.layout.column()
-        for value, label, _description in DENSITIES:
-            col.label(text=label)
-            row = col.row(align=True)
-            for shape, name, icon in (('SPHERE', "Sphere", 'MESH_UVSPHERE'), ('CUBE', "Cube", 'MESH_CUBE')):
-                button = row.operator(SCULPTKIT_OT_new_sculpt.bl_idname, text=name, icon=icon)
-                button.shape = shape
-                button.density = value
+        col.row().prop(context.scene, "sculpt_kit_new_faces", expand=True)
+        row = col.row(align=True)
+        for shape, name, icon in (('SPHERE', "Sphere", 'MESH_UVSPHERE'), ('CUBE', "Cube", 'MESH_CUBE'),
+                                  ('CYLINDER', "Cylinder", 'MESH_CYLINDER')):
+            button = row.operator(SCULPTKIT_OT_new_sculpt.bl_idname, text=name, icon=icon)
+            button.shape = shape
+            button.triangles = context.scene.sculpt_kit_new_faces == 'TRIS'
 
 
 _classes = (SCULPTKIT_OT_new_sculpt, SCULPTKIT_PT_sculpt_session)
 
 
 def enable():
+    bpy.types.Scene.sculpt_kit_new_faces = EnumProperty(
+        name="Faces", default='QUADS',
+        items=(('QUADS', "Quads", "New shapes are made of quads, which Divide subdivides cleanly"),
+               ('TRIS', "Triangles", "New shapes are made of triangles")))
     for cls in _classes:
         bpy.utils.register_class(cls)
 
@@ -290,3 +372,4 @@ def enable():
 def disable():
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
+    del bpy.types.Scene.sculpt_kit_new_faces

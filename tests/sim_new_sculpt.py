@@ -53,7 +53,7 @@ def test(sim):
     # --------------------------------------------- Blender's starting scene
     sim.check("the scene starts with Blender's cube", on_screen() == ["Cube"] and active() == ("Cube", 'OBJECT'), on_screen())
     view = rv3d.view_matrix.copy()
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     first = bpy.context.active_object.name
     sim.check("the sphere is the size of the cube and takes its place: the cube is hidden",
@@ -65,7 +65,7 @@ def test(sim):
     yield from sim.undo()
     sim.check("undo brings the cube back and takes the sphere away", on_screen() == ["Cube"] and meshes() == ["Cube"]
               and active() == ("Cube", 'OBJECT'), (on_screen(), active()))
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     first = bpy.context.active_object.name
 
@@ -74,7 +74,7 @@ def test(sim):
     yield 0.4
     sim.check("the view was turned, as it is while sculpting", not close(rv3d.view_matrix, view))
     view = rv3d.view_matrix.copy()
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     part = bpy.context.active_object
     sim.check("adding a sphere to a sculpt leaves the view exactly where it was", close(rv3d.view_matrix, view, 1e-6))
@@ -98,7 +98,7 @@ def test(sim):
     # ------------------------- changing a setting in the corner panel, after a stroke
     centre = sim.project((0.0, 0.0, 0.0))
     yield from sim.drag(centre, (centre[0] + 30, centre[1] + 12))
-    sim.call(bpy.ops.sculptkit.new_sculpt, shape='CUBE', density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt, shape='CUBE')
     yield 1.0
     count = len(meshes())
     for rounding in (0.3, 0.6):
@@ -125,21 +125,21 @@ def test(sim):
     rv3d.view_location = rv3d.view_location + rv3d.view_rotation @ Vector((3.0, 0.0, 0.0))
     yield 0.5
     view = rv3d.view_matrix.copy()
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     beside = bpy.context.active_object
     # To within a pixel of it: the middle of a canvas an odd number of pixels wide falls between two pixels.
     sim.check("with the sculpt off to the side, the sphere goes to the point the view turns about",
               close(beside.location, rv3d.view_location, 5e-3) and in_the_middle(beside) and across(beside, 2.0)
               and close(rv3d.view_matrix, view, 1e-6), (tuple(beside.location), tuple(rv3d.view_location)))
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     again = bpy.context.active_object
     sim.check("the next one lands on that sphere's surface, the same size again",
               across(again, 2.0) and abs((again.location - beside.location).length - 1.0) < 0.01,
               (tuple(again.dimensions), round((again.location - beside.location).length, 4)))
 
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6', radius=0.4, location=(0.0, 3.0, 0.0), frame=True)
+    sim.call(bpy.ops.sculptkit.new_sculpt, radius=0.4, location=(0.0, 3.0, 0.0), frame=True)
     yield 1.0
     given = bpy.context.active_object
     sim.check("a radius, a location and framing that are asked for are what you get", across(given, 0.8)
@@ -151,7 +151,7 @@ def test(sim):
     look((0.0, 0.0, 0.0), 12.0)
     yield 0.5
     view = rv3d.view_matrix.copy()
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     sim.check("with nothing on screen and the view on the spot, the view is left alone",
               close(bpy.context.active_object.location, (0, 0, 0)) and across(bpy.context.active_object, 2.0)
@@ -159,14 +159,14 @@ def test(sim):
     only()
     look((0.0, 0.0, 40.0), 5.0)
     yield 0.5
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     sim.check("with the view looking somewhere else, it is framed", close(rv3d.view_location, (0, 0, 0), 1e-3),
               tuple(rv3d.view_location))
     only()
     look((0.0, 0.0, 0.0), 400.0)
     yield 0.5
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     fresh = bpy.context.active_object
     sim.check("with the view too far out to work on it, it is framed", rv3d.view_distance < 20.0
@@ -186,7 +186,7 @@ def test(sim):
     yield 1.0
     left, right = sim.view3d_areas()
     view = sim.rv3d(right).view_matrix.copy()
-    sim.call(bpy.ops.sculptkit.new_sculpt, area=right, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt, area=right)
     yield 1.0
     part = bpy.context.active_object
     sim.check("a reference that surrounds the sculpt is not in the way",
@@ -206,7 +206,7 @@ def test(sim):
     space = sim.space()
     sim.check("Solo shows the active sculpt alone", space.local_view is not None and shown(part, space)
               and not shown(fresh, space))
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     solo = bpy.context.active_object
     sim.check("a sphere added while Solo is on can be seen", shown(solo, space) and across(solo, 2.0)
@@ -219,7 +219,7 @@ def test(sim):
     was = solo.name
     sim.call(bpy.ops.sculptkit.subtool_show, name=was)
     yield 0.3
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     sim.check("a sculpt whose eye is off hides when a new sphere takes over from it",
               not bpy.data.objects[was].visible_get() and bpy.context.active_object.name != was
@@ -229,14 +229,14 @@ def test(sim):
     only("RefCube")
     look((0.0, 0.0, 0.0), 20.0)
     yield 0.5
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6')
+    sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0
     sphere = bpy.context.active_object
     sim.check("a cube of your own is not hidden: the sphere is added to it", cube.visible_get()
               and abs(max(abs(v) for v in sphere.location) - 2.0) < 0.01, tuple(sphere.location))
     only("Cube")
     yield 0.5
-    sim.call(bpy.ops.sculptkit.new_sculpt, density='6', hide_cube=False)
+    sim.call(bpy.ops.sculptkit.new_sculpt, hide_cube=False)
     yield 1.0
     sphere = bpy.context.active_object
     sim.check("with Hide Starting Cube off, Blender's cube stays and the sphere is added to it",

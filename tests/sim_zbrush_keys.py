@@ -14,11 +14,11 @@ def test(sim):
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
     with sim.override():
-        bpy.ops.sculptkit.new_sculpt(density='7', frame=True)
+        bpy.ops.sculptkit.new_sculpt(frame=True)
     yield 1.0
     ob = bpy.context.active_object
     sculpt = bpy.context.tool_settings.sculpt
-    sim.check("new sculpt sphere is ready", bpy.context.mode == 'SCULPT' and len(ob.data.polygons) == 6 * 4 ** 7,
+    sim.check("new sculpt sphere is ready", bpy.context.mode == 'SCULPT' and len(ob.data.polygons) == 6 * 4 ** 6,
               "%s, %d faces" % (bpy.context.mode, len(ob.data.polygons)))
 
     def model():

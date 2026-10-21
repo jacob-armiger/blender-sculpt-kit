@@ -89,7 +89,8 @@ check("every feature is on by default", all(getattr(prefs, s) for s in switches)
 LOOK_CLASSES = ("SCULPTKIT_OT_zbrush_layout", "SCULPTKIT_OT_brush_direction", "SCULPTKIT_PT_material",
                 "SCULPTKIT_OT_material",
                 "SCULPTKIT_OT_subtool_select", "SCULPTKIT_OT_subtool_show", "SCULPTKIT_OT_subtool_duplicate",
-                "SCULPTKIT_OT_subtool_merge_down", "SCULPTKIT_OT_subtool_delete", "SCULPTKIT_PT_subtools")
+                "SCULPTKIT_OT_subtool_merge_down", "SCULPTKIT_OT_subtool_move", "SCULPTKIT_OT_subtool_delete",
+                "SCULPTKIT_PT_subtools")
 for cls in ("SCULPTKIT_OT_canvas_navigate", "SCULPTKIT_OT_canvas_mask", "SCULPTKIT_OT_divide",
             "SCULPTKIT_OT_reference_view", "SCULPTKIT_PT_reference_view", "SCULPTKIT_OT_new_sculpt",
             "SCULPTKIT_PT_sculpt_session", "SCULPTKIT_OT_copy_brush_tuning", "SCULPTKIT_OT_reset_brush", "SCULPTKIT_PT_brush_tuning",
@@ -447,21 +448,21 @@ bpy.data.objects.remove(cube)
 
 # ---- new sculpt sphere
 on_screen = [o for o in bpy.context.view_layer.objects if o.type == 'MESH' and o.visible_get()]
-bpy.ops.sculptkit.new_sculpt(density='6')
+bpy.ops.sculptkit.new_sculpt()
 ob = bpy.context.active_object
 check("Blender's starting cube is hidden to make room for the first sphere", [o.name for o in on_screen] == ["Cube"]
       and not on_screen[0].visible_get() and tuple(ob.location) == (0.0, 0.0, 0.0), [o.name for o in on_screen])
 radii = [v.co.length for v in ob.data.vertices]
-check("new sculpt makes a 25k quad sphere", ob.name.startswith("Sculpt") and len(ob.data.polygons) == 6 * 4 ** 6
+check("new sculpt makes a 25k quad sphere", ob.name.startswith("Sphere") and len(ob.data.polygons) == 6 * 4 ** 6
       and all(len(p.vertices) == 4 for p in ob.data.polygons), len(ob.data.polygons))
 check("it is the size of that cube: radius 1", abs(min(radii) - 1.0) < 1e-4 and abs(max(radii) - 1.0) < 1e-4,
       (min(radii), max(radii)))
 check("new sculpt enters Sculpt Mode", bpy.context.mode == 'SCULPT', bpy.context.mode)
-bpy.ops.sculptkit.new_sculpt(density='6')
+bpy.ops.sculptkit.new_sculpt()
 part = bpy.context.active_object
 check("one added to a sculpt is the same size", part != ob and bpy.context.mode == 'SCULPT' and ob.visible_get()
       and all(abs(d - 2.0) < 1e-3 for d in part.dimensions), tuple(part.dimensions))
-bpy.ops.sculptkit.new_sculpt(shape='CUBE', density='6', location=(6.0, 0.0, 0.0))
+bpy.ops.sculptkit.new_sculpt(shape='CUBE', location=(6.0, 0.0, 0.0))
 cube = bpy.context.active_object
 corners = np.array([v.co for v in cube.data.vertices])
 edges = np.array([(cube.data.vertices[e.vertices[0]].co - cube.data.vertices[e.vertices[1]].co).length for e in cube.data.edges])
@@ -472,15 +473,37 @@ far = float(np.linalg.norm(corners, axis=1).max())
 check("its edges and corners are shaved off by a tenth of its half-width", abs(far - (0.9 * 3 ** 0.5 + 0.1)) < 1e-3
       and abs(float(np.abs(corners).max()) - 1.0) < 1e-5, far)
 check("its quads are all about the same size", edges.max() < 1.45 * edges.min(), (float(edges.min()), float(edges.max())))
-bpy.ops.sculptkit.new_sculpt(shape='CUBE', density='6', rounding=0.0, location=(9.0, 0.0, 0.0))
+bpy.ops.sculptkit.new_sculpt(shape='CUBE', rounding=0.0, location=(9.0, 0.0, 0.0))
 sharp = bpy.context.active_object
 check("with no rounding it is a plain cube", abs(float(np.linalg.norm([v.co for v in sharp.data.vertices], axis=1).max()) - 3 ** 0.5) < 1e-4)
-bpy.ops.sculptkit.new_sculpt(density='6', radius=0.7, location=(3.0, 0.0, 0.0))
+bpy.ops.sculptkit.new_sculpt(radius=0.7, location=(3.0, 0.0, 0.0))
 given = bpy.context.active_object
 check("a radius and a location that are given are kept", all(abs(d - 1.4) < 1e-3 for d in given.dimensions)
       and tuple(given.location) == (3.0, 0.0, 0.0), (tuple(given.dimensions), tuple(given.location)))
+bpy.ops.sculptkit.new_sculpt(shape='CYLINDER', location=(12.0, 0.0, 0.0))
+rod = bpy.context.active_object
+co = np.array([v.co for v in rod.data.vertices])
+rod_edges = np.array([(rod.data.vertices[e.vertices[0]].co - rod.data.vertices[e.vertices[1]].co).length
+                      for e in rod.data.edges])
+across = np.linalg.norm(co[:, :2], axis=1)
+check("the cylinder stands 2 tall and 0.2 across, of quads", abs(rod.dimensions.z - 2.0) < 1e-3
+      and abs(rod.dimensions.x - 0.2) < 1e-3 and all(len(p.vertices) == 4 for p in rod.data.polygons),
+      (tuple(rod.dimensions), len(rod.data.polygons)))
+check("it is round across, with rounded ends", abs(float(across[np.abs(co[:, 2]) < 0.85].min()) - 0.1) < 1e-4
+      and float(across[np.abs(co[:, 2]) > 0.999].max()) < 0.02, float(across.max()))
+check("its quads are all about the same size", rod_edges.max() < 1.6 * rod_edges.min(),
+      (float(rod_edges.min()), float(rod_edges.max())))
+import bmesh
+closed = bmesh.new()
+closed.from_mesh(rod.data)
+check("its mesh is closed", all(len(e.link_faces) == 2 for e in closed.edges) and len(closed.verts) == len(co))
+closed.free()
+bpy.ops.sculptkit.new_sculpt(triangles=True, location=(15.0, 0.0, 0.0))
+tris = bpy.context.active_object
+check("Triangles gives the same sphere in triangles", len(tris.data.polygons) == 2 * 6 * 4 ** 6
+      and all(len(p.vertices) == 3 for p in tris.data.polygons), len(tris.data.polygons))
 bpy.ops.object.mode_set(mode='OBJECT')
-for extra in (part, given, cube, sharp):
+for extra in (part, given, cube, sharp, rod, tris):
     bpy.data.objects.remove(extra)
 ob.select_set(True)
 bpy.context.view_layer.objects.active = ob

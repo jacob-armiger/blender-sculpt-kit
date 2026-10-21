@@ -24,11 +24,12 @@ All switches are in Preferences > Add-ons > Sculpt Kit.
 |---|---|
 | ZBrush navigation and keys | Sculpt Mode only: right-drag and empty-canvas navigation, Alt inverts, Ctrl masks, ZBrush hotkeys (S size, U strength, F frame, X symmetry, B brushes, D / Shift+D / Ctrl+D subdivision) |
 | ZBrush look | Colour theme (ZBrush or KlaySculpt style), ZBrush Layout button in the top bar, ZBrush-style brush bar and view switches, Subtools list, material (red wax, grey, brown clay). Each part has its own switch. As in ZBrush, the subtool you are working on stays in view: with its eye off, it hides when you pick another |
-| Move brush | Move that grabs through the whole model |
+| Move and rake brushes | Move that grabs through the whole model; a five-dot clay rake built on Blender's Clay brush, with settings and alpha shared on Discord; Clay Rake V3, which lays flat strips like Clay Strips with three thin, square-cut spines and wide, shallow grooves; SculptKit_Clay, a copy of Kingslien_Clay with the pen tuning; and plain copies of Blender's Clay Strips (Clay Strips Copy) and Clay (Clay Soft) |
 | Kingslien brushes | Clay, Rake V2, HairTexture, Knife, KnifeSoft, ported from Ryan Kingslien's ZBrush brushes. Clay and Rake V2 are tuned with the pen against strokes made in ZBrush |
 | Synced reference view | Splits the viewport: reference on the left, sculpt on the right, both kept on the same view and the same frame, level with each other. Matching Edges dims whatever one half shows and the other does not, so the edge of the picture can be measured against like calipers |
 | New sculpt sphere or cube | Dense quad sphere, or cube with its edges and corners shaved off, at 25 thousand to 1.5 million faces, in Sculpt Mode, viewport set up. The cube's Rounding can be changed right after adding it. Every shape is the size of Blender's starting cube, 2 units across. The first goes to the centre of the scene and Blender's untouched starting cube is hidden to make room. One added to a sculpt goes on the surface in the middle of the view. The view only moves when it does not already show the sphere |
 | Remesh tools | Voxel Remesh by resolution on Ctrl+R; Quad Remesh that repairs the mesh first |
+| Subdivide | Sidebar panel like ZBrush's Geometry menu: Divide (Ctrl+D, adds Multires), Lower / Higher, SDiv, Delete Higher, Apply, Remove; Subdivide Mesh smooths the mesh one level with no modifier |
 | Brush tuning helper | Copy Tuning copies the active brush's settings; Reset to Saved returns the brush to the settings in its library |
 
 The panels are in the 3D viewport sidebar (N), in the Sculpt Kit tab. The brushes are in the Sculpt Mode brush shelf.
@@ -65,6 +66,7 @@ Bump `version` in `sculpt_kit/blender_manifest.toml` before building a new relea
 | `sculpt_kit/assets/` | Built brush libraries and the grey matcap (generated; do not edit by hand) |
 | `tools/` | Build scripts: `build_assets.py` (kit brushes), `kingslien.py` (ZBrush brush port), `build_theme.py` (colour styles), `build_matcap.py` (grey material) |
 | `brush_sources/kingslien/` | The original ZBrush `.ZBP` brush files |
+| `brush_sources/shared/` | Alphas other people shared: the five-dot rake's |
 | `tuning/brushes.toml` | Brush setting overrides from pen testing |
 | `tests/` | Headless checks and simulated-input tests |
 | `dist/` | Built zips |

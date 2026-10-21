@@ -95,6 +95,33 @@ def test(sim):
               on_screen() == [first] and active() == (first, 'SCULPT') and close(rv3d.view_matrix, view, 1e-6),
               (on_screen(), active()))
 
+    # ------------------------- changing a setting in the corner panel, after a stroke
+    centre = sim.project((0.0, 0.0, 0.0))
+    yield from sim.drag(centre, (centre[0] + 30, centre[1] + 12))
+    sim.call(bpy.ops.sculptkit.new_sculpt, shape='CUBE', density='6')
+    yield 1.0
+    count = len(meshes())
+    for rounding in (0.3, 0.6):
+        bpy.context.window_manager.operators[-1].properties.rounding = rounding
+        with sim.override():
+            bpy.ops.ed.undo_redo('EXEC_DEFAULT', True)  # what a change in the corner panel runs
+        yield 1.0
+    changed = bpy.context.active_object
+    farthest = max(v.co.length for v in changed.data.vertices)
+    sim.check("changing the cube's settings in the corner panel changes that cube and adds no more",
+              len(meshes()) == count and abs(farthest - (0.4 * 3 ** 0.5 + 0.6)) < 1e-3 and bpy.context.mode == 'SCULPT',
+              (len(meshes()), count, round(farthest, 4)))
+    with sim.override():
+        bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.data.objects.remove(changed)
+    first_ob = bpy.data.objects[first]
+    first_ob.select_set(True)
+    bpy.context.view_layer.objects.active = first_ob
+    with sim.override():
+        bpy.ops.object.mode_set(mode='SCULPT')
+        bpy.ops.ed.undo_push(message="Back on the first sculpt")
+    yield 0.5
+
     rv3d.view_location = rv3d.view_location + rv3d.view_rotation @ Vector((3.0, 0.0, 0.0))
     yield 0.5
     view = rv3d.view_matrix.copy()

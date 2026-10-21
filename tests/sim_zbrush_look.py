@@ -122,6 +122,21 @@ def test(sim):
     yield from sim.drag(centre, (centre[0] + 90, centre[1] + 30))
     sim.check("sculpting works on the big canvas", float(np.abs(sim.positions() - before).max()) > 1e-5)
 
+    # Holding the invert key lights the other one of Zadd / Zsub for as long as it is held.
+    shelf, window = look.shelf, sim.window
+    sim._send('LEFT_ALT', 'PRESS', centre, {"alt": True})
+    yield 0.3
+    sim.check("holding Alt lights Zsub without changing the brush", shelf._invert_held(window)
+                            and bpy.context.tool_settings.sculpt.brush.direction == 'ADD')
+    sim._send('LEFT_ALT', 'RELEASE', centre, {})
+    yield 0.3
+    sim.check("letting go lights Zadd again", not shelf._invert_held(window))
+    sim._send('LEFT_CTRL', 'PRESS', centre, {"ctrl": True})
+    yield 0.3
+    sim.check("Ctrl, which masks with the ZBrush keys, does not", not shelf._invert_held(window))
+    sim._send('LEFT_CTRL', 'RELEASE', centre, {})
+    yield 0.3
+
     # ---------------------------------------------------------------- subtools
     # Operators are run the way a click runs them, so that each records its undo step.
     def active():

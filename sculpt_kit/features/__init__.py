@@ -6,7 +6,7 @@ preferences is the BoolProperty `use_<id>` (see preferences.py).
 from collections import namedtuple
 
 from .. import common
-from . import brush_library, brush_tuning, reference_view, remesh, sculpt_session, zbrush_keys, zbrush_look
+from . import brush_library, brush_tuning, reference_view, remesh, sculpt_session, subdivide, zbrush_keys, zbrush_look
 
 Feature = namedtuple("Feature", "id label description enable disable")
 
@@ -17,8 +17,8 @@ FEATURES = (
     Feature("zbrush_look", "ZBrush look",
             "Colour theme, layout, shelf, subtool list and material that make Blender read like ZBrush or KlaySculpt",
             zbrush_look.enable, zbrush_look.disable),
-    Feature("kit_brushes", "Move brush",
-            "Brush library with a Move brush that grabs through the whole model",
+    Feature("kit_brushes", "Move and rake brushes",
+            "Brush library with a Move brush that grabs through the whole model, a five-dot rake and a clay rake",
             brush_library.enable_kit, brush_library.disable_kit),
     Feature("kingslien_brushes", "Kingslien brushes",
             "Brush library with the Clay, Rake V2, HairTexture and Knife brushes ported from ZBrush",
@@ -32,6 +32,9 @@ FEATURES = (
     Feature("remesh", "Remesh tools",
             "Voxel Remesh by resolution on Ctrl + R, like DynaMesh, and a Quad Remesh that repairs the mesh first",
             remesh.enable, remesh.disable),
+    Feature("subdivide", "Subdivide",
+            "Sidebar panel for subdivision levels like ZBrush's: Divide, Lower / Higher, SDiv, and a plain Subdivide Mesh",
+            subdivide.enable, subdivide.disable),
     Feature("brush_tuning", "Brush tuning helper",
             "Sidebar buttons that copy the active brush's settings or return it to its saved ones",
             brush_tuning.enable, brush_tuning.disable),

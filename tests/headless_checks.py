@@ -37,8 +37,9 @@ def all_kit_keys():
 
 
 def kit_keys():
-    """The ZBrush keys: everything the kit binds except the remesh feature's own Ctrl + R."""
-    return [key for key in all_kit_keys() if key != REMESH_KEY]
+    """The ZBrush keys: everything the kit binds except the remesh feature's own Ctrl + R and the ZBrush look's
+    watcher of the modifier keys (it binds nothing a person presses; it lights Zsub while Alt is held)."""
+    return [key for key in all_kit_keys() if key != REMESH_KEY and key[0] != "sculptkit.watch_modifiers"]
 
 
 def has_key(idname, key, ctrl=False, shift=False, alt=False):
@@ -83,7 +84,7 @@ kingslien_library = os.path.normpath(os.path.join(assets, "kingslien"))
 
 # ---- defaults
 switches = ["use_zbrush_keys", "use_zbrush_look", "use_kit_brushes", "use_kingslien_brushes", "use_reference_view",
-            "use_sculpt_session", "use_remesh", "use_brush_tuning"]
+            "use_sculpt_session", "use_remesh", "use_subdivide", "use_brush_tuning"]
 check("every feature is on by default", all(getattr(prefs, s) for s in switches))
 LOOK_CLASSES = ("SCULPTKIT_OT_zbrush_layout", "SCULPTKIT_OT_brush_direction", "SCULPTKIT_PT_material",
                 "SCULPTKIT_OT_material",
@@ -92,7 +93,8 @@ LOOK_CLASSES = ("SCULPTKIT_OT_zbrush_layout", "SCULPTKIT_OT_brush_direction", "S
 for cls in ("SCULPTKIT_OT_canvas_navigate", "SCULPTKIT_OT_canvas_mask", "SCULPTKIT_OT_divide",
             "SCULPTKIT_OT_reference_view", "SCULPTKIT_PT_reference_view", "SCULPTKIT_OT_new_sculpt",
             "SCULPTKIT_PT_sculpt_session", "SCULPTKIT_OT_copy_brush_tuning", "SCULPTKIT_OT_reset_brush", "SCULPTKIT_PT_brush_tuning",
-            "SCULPTKIT_OT_voxel_remesh", "SCULPTKIT_OT_quad_remesh", "SCULPTKIT_PT_remesh") + LOOK_CLASSES:
+            "SCULPTKIT_OT_voxel_remesh", "SCULPTKIT_OT_quad_remesh", "SCULPTKIT_PT_remesh",
+            "SCULPTKIT_OT_multires_finish", "SCULPTKIT_OT_subdivide_mesh", "SCULPTKIT_PT_subdivide") + LOOK_CLASSES:
     check("registered " + cls, registered(cls))
 
 # ---- ZBrush keys
@@ -345,6 +347,30 @@ check("both libraries back", kit_library in library_paths() and kingslien_librar
 
 with bpy.data.libraries.load(os.path.join(kit_library, "SculptKit_Brushes.blend"), assets_only=True) as (src, dst):
     dst.brushes = list(src.brushes)
+dots = next((b for b in dst.brushes if b.name == "SculptKit_Rake_Dots"), None)
+check("the five-dot rake is in the kit library, on Blender's Clay brush, with its alpha following the stroke",
+      dots is not None and dots.sculpt_brush_type == 'CLAY' and dots.texture is not None and dots.texture_slot.use_rake
+      and dots.texture.image.size[:] == (512, 512), dots and dots.sculpt_brush_type)
+if dots is not None:
+    got = (dots.strength, dots.spacing, round(dots.hardness, 3), round(dots.auto_smooth_factor, 3),
+           round(dots.normal_radius_factor, 3), round(dots.plane_offset, 3), dots.use_accumulate, dots.use_pressure_strength,
+           dots.use_pressure_size, dots.use_inverse_smooth_pressure, dots.use_space_attenuation)
+    check("with the settings it was shared with", got == (0.5, 3, 0.65, 0.25, 0.75, 0.4, True, True, False, True, True), got)
+clay_rake = next((b for b in dst.brushes if b.name == "SculptKit_Clay_Rake_V3"), None)
+check("the clay rake is in the kit library, on Clay Strips, with its raked strip following the stroke",
+      clay_rake is not None and clay_rake.sculpt_brush_type == 'CLAY_STRIPS' and clay_rake.texture is not None
+      and clay_rake.texture_slot.use_rake and clay_rake.use_pressure_size and clay_rake.use_pressure_strength,
+      clay_rake and clay_rake.sculpt_brush_type)
+check("the earlier clay rakes are gone",
+      not any(b.name in ("SculptKit_Clay_Rake", "SculptKit_Clay_Rake_V2") for b in dst.brushes))
+kit_types = {b.name: b.sculpt_brush_type for b in dst.brushes}
+check("the kit has copies of Blender's Clay Strips and Clay (as Clay Soft)",
+      kit_types.get("SculptKit_Clay_Strips_Copy") == 'CLAY_STRIPS' and kit_types.get("SculptKit_Clay_Soft") == 'CLAY',
+      kit_types)
+sk_clay = next((b for b in dst.brushes if b.name == "SculptKit_Clay"), None)
+check("SculptKit_Clay is Kingslien_Clay with Jacob's tuning",
+      sk_clay is not None and sk_clay.sculpt_brush_type == 'CLAY_STRIPS' and round(sk_clay.strength, 4) == 0.4313
+      and round(sk_clay.tip_roundness, 3) == 0.7, sk_clay and (sk_clay.strength, sk_clay.tip_roundness))
 move = next((b for b in dst.brushes if b.name == "SculptKit_Move"), None)
 check("Move brush is an asset in the kit library", move is not None)
 if move is not None:
@@ -382,6 +408,42 @@ check("remesh tools switch off alone",
       and not hasattr(bpy.types.Scene, "sculpt_kit_remesh_resolution") and len(kit_keys()) == all_keys)
 prefs.use_remesh = True
 check("remesh tools back on", registered("SCULPTKIT_OT_quad_remesh") and REMESH_KEY in all_kit_keys())
+
+prefs.use_subdivide = False
+check("subdivide switches off alone, Divide staying for Ctrl + D",
+      not registered("SCULPTKIT_PT_subdivide") and not registered("SCULPTKIT_OT_subdivide_mesh")
+      and registered("SCULPTKIT_OT_divide") and has_key("sculptkit.divide", 'D', ctrl=True))
+prefs.use_zbrush_keys = False
+check("with the ZBrush keys off too, Divide goes", not registered("SCULPTKIT_OT_divide"))
+prefs.use_subdivide = True
+check("subdivide alone brings Divide back", registered("SCULPTKIT_OT_divide") and registered("SCULPTKIT_PT_subdivide"))
+prefs.use_zbrush_keys = True
+check("both back on", registered("SCULPTKIT_OT_divide") and has_key("sculptkit.divide", 'D', ctrl=True))
+
+# subdivide at work, on a cube (6 faces)
+bpy.ops.mesh.primitive_cube_add()
+cube = bpy.context.active_object
+bpy.ops.sculptkit.subdivide_mesh('EXEC_DEFAULT', True)
+check("Subdivide Mesh smooths the mesh into four times the faces, leaving no modifier",
+      len(cube.data.polygons) == 24 and not cube.modifiers, (len(cube.data.polygons), list(cube.modifiers)))
+bpy.ops.object.mode_set(mode='SCULPT')
+bpy.ops.sculptkit.divide('EXEC_DEFAULT', True)
+bpy.ops.sculptkit.divide('EXEC_DEFAULT', True)
+multires = cube.modifiers[0] if cube.modifiers else None
+check("Divide twice gives a Multires with two levels, sculpting on the top one",
+      multires is not None and multires.type == 'MULTIRES' and multires.total_levels == 2 and multires.sculpt_levels == 2,
+      multires and (multires.type, multires.total_levels, multires.sculpt_levels))
+check("Subdivide Mesh steps aside while there are levels", not bpy.ops.sculptkit.subdivide_mesh.poll())
+multires.sculpt_levels = 1
+bpy.ops.sculptkit.multires_finish('EXEC_DEFAULT', True, action='APPLY')
+check("Apply bakes the level shown into the mesh and stays in Sculpt Mode",
+      not cube.modifiers and len(cube.data.polygons) == 96 and cube.mode == 'SCULPT',
+      (len(cube.data.polygons), list(cube.modifiers), cube.mode))
+bpy.ops.sculptkit.divide('EXEC_DEFAULT', True)
+bpy.ops.sculptkit.multires_finish('EXEC_DEFAULT', True, action='REMOVE')
+check("Remove drops the levels, keeping the base mesh", not cube.modifiers and len(cube.data.polygons) == 96)
+bpy.ops.object.mode_set(mode='OBJECT')
+bpy.data.objects.remove(cube)
 
 # ---- new sculpt sphere
 on_screen = [o for o in bpy.context.view_layer.objects if o.type == 'MESH' and o.visible_get()]

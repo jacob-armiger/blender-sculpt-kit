@@ -6,6 +6,13 @@ ZBrush keeps on its left shelf, then Zadd / Zsub, Z Intensity and Draw Size
 from its top shelf. The viewport header gains the view switches from ZBrush's
 right shelf (Persp, Floor, PolyF, Transp, Solo) and a material picker.
 
+While the invert key is held (Alt with the kit's ZBrush keys, otherwise Ctrl),
+Zadd / Zsub light the other way, as a hint of what a stroke will do. The
+brush's own setting is left alone. Blender's Python cannot ask which keys are
+down, so a pass-through Sculpt Mode key binding notes the modifier keys from
+their own presses and releases and from every mouse move, and redraws the bar
+when they change.
+
 Blender has no hook for rearranging that bar, so its own draw function is
 swapped for ours, in the list Blender draws the bar from, while the part is on.
 Anything that is not a sculpt brush is handed straight back to Blender's
@@ -18,6 +25,42 @@ from ... import common
 from . import material
 
 _blender_draw = None  # Blender's own draw function for the bar, while ours stands in for it
+_held = {}  # window pointer -> (alt, ctrl) as last seen in that window
+_keymap_items = []
+_MODIFIER_KEYS = {'LEFT_ALT': "alt", 'RIGHT_ALT': "alt", 'LEFT_CTRL': "ctrl", 'RIGHT_CTRL': "ctrl"}
+
+
+def _invert_held(window):
+    """Whether the key that inverts a stroke is held down in this window, and nothing that would make it mask."""
+    from ... import features
+    alt, ctrl = _held.get(window.as_pointer(), (False, False))
+    prefs = common.prefs()
+    if features.is_enabled("zbrush_keys") and prefs is not None and prefs.keys_modifiers:
+        return alt and not ctrl  # Ctrl + Alt masks
+    return ctrl and not alt
+
+
+class SCULPTKIT_OT_watch_modifiers(bpy.types.Operator):
+    """Notes which modifier keys are down, so Zadd / Zsub can show what a stroke will do"""
+    bl_idname = "sculptkit.watch_modifiers"
+    bl_label = "Watch Modifier Keys"
+    bl_options = {'INTERNAL'}
+
+    def invoke(self, context, event):
+        window = context.window
+        alt, ctrl = event.alt, event.ctrl
+        side = _MODIFIER_KEYS.get(event.type)
+        if side is not None:  # the key's own press or release says more surely than the flags on it
+            down = event.value == 'PRESS'
+            alt, ctrl = (down, ctrl) if side == "alt" else (alt, down)
+        if window is not None and _held.get(window.as_pointer(), (False, False)) != (alt, ctrl):
+            _held[window.as_pointer()] = (alt, ctrl)
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    for region in area.regions:
+                        if region.type == 'TOOL_HEADER':
+                            region.tag_redraw()
+        return {'PASS_THROUGH'}
 
 
 def _shelf(self, context):
@@ -52,9 +95,12 @@ def _shelf(self, context):
         row = layout.row(align=True)
         if brush.direction in {'ADD', 'SUBTRACT'}:
             row.ui_units_x = 4.6
+            lit = brush.direction
+            if _invert_held(context.window):
+                lit = 'SUBTRACT' if lit == 'ADD' else 'ADD'
             for value, label in (('ADD', "Zadd"), ('SUBTRACT', "Zsub")):
                 row.operator(SCULPTKIT_OT_brush_direction.bl_idname, text=label,
-                             depress=brush.direction == value).direction = value
+                             depress=lit == value).direction = value
         else:
             row.prop(brush, "direction", expand=True, text="")  # Flatten, Scrape and others name the two their own way
 
@@ -143,7 +189,7 @@ class SCULPTKIT_PT_material(bpy.types.Panel):
         col.prop(shading, "show_cavity")
 
 
-_classes = (SCULPTKIT_OT_brush_direction, SCULPTKIT_PT_material)
+_classes = (SCULPTKIT_OT_brush_direction, SCULPTKIT_OT_watch_modifiers, SCULPTKIT_PT_material)
 
 
 def _bar_functions():
@@ -165,6 +211,12 @@ def enable(by_user=False):
     for cls in _classes:
         bpy.utils.register_class(cls)
     bpy.types.VIEW3D_HT_header.append(_view_switches)
+    keyconfig = bpy.context.window_manager.keyconfigs.addon
+    if keyconfig is not None:
+        keymap = keyconfig.keymaps.new("Sculpt", space_type='EMPTY')
+        for key, value in [('MOUSEMOVE', 'ANY')] + [(k, v) for k in _MODIFIER_KEYS for v in ('PRESS', 'RELEASE')]:
+            _keymap_items.append((keymap, keymap.keymap_items.new(
+                SCULPTKIT_OT_watch_modifiers.bl_idname, key, value, any=True)))
     common.redraw_all()
 
 
@@ -175,6 +227,13 @@ def disable(restore=True):
         functions[functions.index(_shelf)] = _blender_draw
     _blender_draw = None
     bpy.types.VIEW3D_HT_header.remove(_view_switches)
+    for keymap, item in _keymap_items:
+        try:
+            keymap.keymap_items.remove(item)
+        except (ReferenceError, RuntimeError):
+            pass
+    _keymap_items.clear()
+    _held.clear()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
     if restore:

@@ -14,6 +14,7 @@ import numpy as np
 from bpy.props import BoolProperty, EnumProperty
 
 from .. import common
+from . import subdivide
 
 # Preference switch -> the lines shown under it in the add-on preferences.
 CHEAT_SHEET = (
@@ -169,28 +170,7 @@ class SCULPTKIT_OT_canvas_mask(bpy.types.Operator):
                                            mode='VALUE', value=0.0 if self.unmask else 1.0)
 
 
-class SCULPTKIT_OT_divide(bpy.types.Operator):
-    """Add one subdivision level, creating a Multires modifier if the mesh has none"""
-    bl_idname = "sculptkit.divide"
-    bl_label = "Divide"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        ob = context.active_object
-        return ob is not None and ob.type == 'MESH'
-
-    def execute(self, context):
-        ob = context.active_object
-        multires = next((m for m in ob.modifiers if m.type == 'MULTIRES'), None)
-        if multires is None:
-            bpy.ops.object.modifier_add(type='MULTIRES')
-            multires = next(m for m in ob.modifiers if m.type == 'MULTIRES')
-        bpy.ops.object.multires_subdivide(modifier=multires.name, mode='CATMULL_CLARK')
-        return {'FINISHED'}
-
-
-_classes = (SCULPTKIT_OT_canvas_navigate, SCULPTKIT_OT_canvas_mask, SCULPTKIT_OT_divide)
+_classes = (SCULPTKIT_OT_canvas_navigate, SCULPTKIT_OT_canvas_mask)  # Ctrl + D's Divide lives in subdivide.py
 
 
 # --------------------------------------------------------------------- keymap
@@ -306,6 +286,7 @@ def rebuild():
 
 
 def enable():
+    subdivide.use_divide("zbrush_keys")
     for cls in _classes:
         bpy.utils.register_class(cls)
     rebuild()
@@ -315,3 +296,4 @@ def disable():
     _remove_keymap()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
+    subdivide.release_divide("zbrush_keys")

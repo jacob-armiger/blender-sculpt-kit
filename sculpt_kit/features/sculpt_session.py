@@ -13,7 +13,7 @@ view, and the view is left where it is.
 """
 import bpy
 import numpy as np
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty, StringProperty
 from bpy_extras import view3d_utils
 from mathutils import Vector
 
@@ -205,11 +205,21 @@ One added to a sculpt goes where you are looking, and the view stays put"""
                                         "hide it and put the sphere in its place")
     setup_view: BoolProperty(name="Set Up Viewport", default=True,
                              description="Matcap shading with cavity; hide the floor grid, axes and 3D cursor")
+    made: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})  # the object the last run of this press added
 
     def execute(self, context):
         from .zbrush_look import subtools
         if context.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
+        # Changing a setting in the corner panel runs this again, after Blender has undone the run before. When
+        # the step before that was a brush stroke, Blender's undo of the run does nothing and the shape it
+        # added is still here: every change would add another. So the last one is taken away here if it is.
+        stale = bpy.data.objects.get(self.made) if self.made else None
+        if stale is not None and stale == context.view_layer.objects.active and stale.type == 'MESH':
+            mesh = stale.data
+            bpy.data.objects.remove(stale)
+            if mesh.users == 0:
+                bpy.data.meshes.remove(mesh)
         space = _viewport(context)
         given = self.properties.is_property_set
 
@@ -230,6 +240,7 @@ One added to a sculpt goes where you are looking, and the view stays put"""
             mesh = _quad_sphere(context.scene, int(self.density), self.radius)
         mesh.name = "Sculpt"
         ob = bpy.data.objects.new("Sculpt", mesh)
+        self.made = ob.name
         ob.location = self.location
         context.collection.objects.link(ob)
         for other in context.selected_objects:

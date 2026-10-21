@@ -59,7 +59,7 @@ class SCULPTKIT_PT_brush_tuning(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = common.PANEL_CATEGORY
-    bl_order = 4
+    bl_order = 5
 
     @classmethod
     def poll(cls, context):

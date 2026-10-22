@@ -25,7 +25,7 @@ def _multires(ob):
 
 
 class SCULPTKIT_OT_divide(bpy.types.Operator):
-    """Add one subdivision level, creating a Multires modifier if the mesh has none"""
+    """Add a Multires level, creating the modifier if the mesh has none (Ctrl D; D and Shift D step between levels)"""
     bl_idname = "sculptkit.divide"
     bl_label = "Divide"
     bl_options = {'REGISTER', 'UNDO'}
@@ -91,7 +91,7 @@ class SCULPTKIT_OT_multires_finish(bpy.types.Operator):
 
 
 class SCULPTKIT_OT_subdivide_mesh(bpy.types.Operator):
-    """Smooth the mesh into one level more detail, straight into the mesh (about four times the faces)"""
+    """Smooth the mesh into four times the faces, with no modifier"""
     bl_idname = "sculptkit.subdivide_mesh"
     bl_label = "Subdivide Mesh"
     bl_options = {'REGISTER', 'UNDO'}
@@ -117,7 +117,7 @@ class SCULPTKIT_PT_subdivide(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = common.PANEL_CATEGORY
-    bl_order = 1
+    bl_order = 3
 
     @classmethod
     def poll(cls, context):
@@ -128,23 +128,29 @@ class SCULPTKIT_PT_subdivide(bpy.types.Panel):
         ob = context.active_object
         multires = _multires(ob)
         col = self.layout.column()
-        col.operator(SCULPTKIT_OT_divide.bl_idname, text="Divide (Ctrl D)", icon='MOD_MULTIRES')
         if multires is None:
-            col.operator(SCULPTKIT_OT_subdivide_mesh.bl_idname, icon='MOD_SUBSURF')
-            col.label(text="{:,} faces".format(len(ob.data.polygons)))
+            row = col.row(align=True)
+            row.operator(SCULPTKIT_OT_divide.bl_idname, text="Divide", icon='MOD_MULTIRES')
+            row.operator(SCULPTKIT_OT_subdivide_mesh.bl_idname, text="Subdivide", icon='MOD_SUBSURF')
+            common.info(col, "%s faces, no Multires levels" % common.face_count(len(ob.data.polygons)))
             return
         row = col.row(align=True)
-        lower = row.operator("object.subdivision_set", text="Lower (Shift D)")
+        lower = row.operator("object.subdivision_set", text="", icon='TRIA_LEFT')
         lower.level, lower.relative, lower.ensure_modifier = -1, True, False
-        higher = row.operator("object.subdivision_set", text="Higher (D)")
+        row.prop(multires, "sculpt_levels", text="Level")
+        higher = row.operator("object.subdivision_set", text="", icon='TRIA_RIGHT')
         higher.level, higher.relative, higher.ensure_modifier = 1, True, False
-        row = col.row()
-        row.prop(multires, "sculpt_levels", text="SDiv")
-        row.label(text="of %d" % multires.total_levels)
-        col.operator("object.multires_higher_levels_delete", text="Delete Higher").modifier = multires.name
+        row = col.row(align=True)
+        row.operator(SCULPTKIT_OT_divide.bl_idname, text="Divide", icon='MOD_MULTIRES')
+        row.operator("object.multires_higher_levels_delete", text="Delete Higher").modifier = multires.name
         row = col.row(align=True)
         row.operator(SCULPTKIT_OT_multires_finish.bl_idname, text="Apply").action = 'APPLY'
         row.operator(SCULPTKIT_OT_multires_finish.bl_idname, text="Remove").action = 'REMOVE'
+        # Each level has four times the faces of the one below. (Blender keeps a Multires sculpt's own count
+        # out of reach in Sculpt Mode, where the evaluated mesh reports only the base mesh.)
+        faces = len(ob.data.polygons) * 4 ** multires.sculpt_levels
+        common.info(col, "Level %d of %d, %s faces" % (multires.sculpt_levels, multires.total_levels,
+                                                     common.face_count(faces)))
 
 
 _classes = (SCULPTKIT_OT_multires_finish, SCULPTKIT_OT_subdivide_mesh, SCULPTKIT_PT_subdivide)

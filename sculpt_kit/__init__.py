@@ -5,7 +5,7 @@ in the add-on preferences, so any of them can be turned off on its own.
 """
 import bpy
 
-from . import features, preferences
+from . import features, preferences, welcome
 
 
 def _sync_later():
@@ -15,6 +15,7 @@ def _sync_later():
 
 def register():
     preferences.register()
+    welcome.register()
     if features.sync_all() is False:
         # Preferences are not reachable yet while the add-on is first being
         # enabled; apply the switches once Blender has finished enabling it.
@@ -25,4 +26,5 @@ def unregister():
     if bpy.app.timers.is_registered(_sync_later):
         bpy.app.timers.unregister(_sync_later)
     features.disable_all()
+    welcome.unregister()
     preferences.unregister()

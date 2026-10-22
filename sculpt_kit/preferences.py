@@ -46,7 +46,8 @@ def _look_style(_self, _context):
 class SculptKitPreferences(bpy.types.AddonPreferences):
     bl_idname = common.PACKAGE
 
-    use_zbrush_keys: BoolProperty(name="ZBrush navigation and keys", default=True,
+    # Off until the welcome dialog (welcome.py) asks: they change how Sculpt Mode behaves.
+    use_zbrush_keys: BoolProperty(name="ZBrush navigation and keys", default=False,
                                   update=_feature_switch("zbrush_keys"))
     use_zbrush_look: BoolProperty(name="ZBrush look", default=True, update=_look_switch)
     use_kit_brushes: BoolProperty(name="Sculpt Kit brushes", default=True,
@@ -87,7 +88,7 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
         name="Style", items=LOOK_STYLES, default='KLAY', update=_look_style,
         description="Which program the colour theme and the material take after")
     look_theme: BoolProperty(
-        name="Colour theme", default=True, update=_look_part,
+        name="Colour theme", default=False, update=_look_part,  # off until the welcome dialog asks
         description="Dress Blender's theme in the chosen style. Switching this off puts your own theme back")
     look_layout: BoolProperty(
         name="ZBrush layout", default=True, update=_look_part,
@@ -112,6 +113,7 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
     # What the colour theme replaced, as JSON, for putting it back.
     look_theme_backup: StringProperty(options={'HIDDEN'})
     look_theme_applied: StringProperty(options={'HIDDEN'})  # which version of the style was last put on
+    welcome_done: BoolProperty(options={'HIDDEN'})  # the welcome dialog has been shown
 
     def draw(self, _context):
         from .features import FEATURES, zbrush_keys, zbrush_look

@@ -82,10 +82,15 @@ assets = os.path.join(os.path.dirname(kit.__file__), "assets")
 kit_library = os.path.normpath(os.path.join(assets, "kit"))
 
 # ---- defaults
-switches = ["use_zbrush_keys", "use_zbrush_look", "use_kit_brushes", "use_reference_view",
+switches = ["use_zbrush_look", "use_kit_brushes", "use_reference_view",
             "use_sculpt_session", "use_remesh", "use_subdivide"]
 check("every feature is on by default, but for brush tuning, which is for development",
       all(getattr(prefs, s) for s in switches) and not prefs.use_brush_tuning)
+check("the ZBrush keys and the colour theme wait for the welcome's answer", not prefs.use_zbrush_keys
+      and not prefs.look_theme and not prefs.welcome_done)
+bpy.ops.sculptkit.welcome('EXEC_DEFAULT', theme='KLAY', keys=True)
+check("answering the welcome turns on what was picked", prefs.use_zbrush_keys and prefs.look_theme
+      and prefs.look_style == 'KLAY' and prefs.welcome_done)
 prefs.use_brush_tuning = True  # the checks below expect every feature on
 LOOK_CLASSES = ("SCULPTKIT_OT_zbrush_layout", "SCULPTKIT_OT_brush_direction", "SCULPTKIT_PT_material",
                 "SCULPTKIT_OT_material",
@@ -175,7 +180,7 @@ def same_value(a, b):
 
 
 parts = ["look_theme", "look_layout", "look_shelf", "look_subtools", "look_material"]
-check("every part of the look is on by default, in the KlaySculpt style",
+check("every part of the look is on, in the KlaySculpt style",
       all(getattr(prefs, p) for p in parts) and prefs.look_style == 'KLAY' and theme.wearing() == 'KLAY', prefs.look_style)
 prefs.look_style = 'ZBRUSH'  # the checks below start from the ZBrush style
 check("the two styles are told apart", len(zbrush) > 200 and len(klay) > 200
@@ -448,6 +453,8 @@ check("Divide twice gives a Multires with two levels, sculpting on the top one",
       multires is not None and multires.type == 'MULTIRES' and multires.total_levels == 2 and multires.sculpt_levels == 2,
       multires and (multires.type, multires.total_levels, multires.sculpt_levels))
 check("Subdivide Mesh steps aside while there are levels", not bpy.ops.sculptkit.subdivide_mesh.poll())
+check("and both remeshes refuse, as Blender's remeshers would",
+      not bpy.ops.sculptkit.voxel_remesh.poll() and not bpy.ops.sculptkit.quad_remesh.poll())
 multires.sculpt_levels = 1
 bpy.ops.sculptkit.multires_finish('EXEC_DEFAULT', True, action='APPLY')
 check("Apply bakes the level shown into the mesh and stays in Sculpt Mode",

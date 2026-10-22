@@ -44,7 +44,7 @@ def test(sim):
     libraries = bpy.context.preferences.filepaths.asset_libraries
     if libraries.get(LIBRARY) is None:
         libraries.new(name=LIBRARY, directory=FOLDER)
-    sim.prefs.use_brush_tuning = True  # off by default; Reset to Saved is checked below
+    sim.prefs.use_brush_tuning = True  # off by default; Revert Brush Changes is checked below
     yield 1.0
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
@@ -171,7 +171,7 @@ def test(sim):
     yield 0.3
     brush = sculpt.brush
     now = (brush.strength, brush.use_pressure_size, brush.auto_smooth_factor, brush.plane_offset)
-    sim.check("Reset to Saved returns a changed brush to its saved settings", result == {'FINISHED'}
+    sim.check("Revert Brush Changes returns a changed brush to its saved settings", result == {'FINISHED'}
               and brush.name == "Kingslien_Clay" and all(abs(a - b) < 1e-6 for a, b in zip(now, saved)), (now, saved))
 
     with sim.override():

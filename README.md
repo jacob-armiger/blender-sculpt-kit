@@ -9,6 +9,7 @@ Requires **Blender 5.2 or newer**.
 1. Download `sculpt_kit-<version>.zip` from [Releases](../../releases).
 2. Drag it onto the Blender window, or use **Preferences > Get Extensions > Install from Disk** (menu at the top right).
 3. Make sure **Sculpt Kit** is enabled under **Preferences > Add-ons**.
+4. A welcome dialog asks whether you want the color theme and the ZBrush keys. Both stay off unless you pick them.
 
 Disabling or uninstalling the kit puts Blender's own theme, keys and brush bar back.
 
@@ -34,7 +35,7 @@ Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt K
 | Move | Pulling out limbs and big changes of shape |
 | Rake Dots | A finer texture |
 
-### Keys (Sculpt Mode only)
+### Keys (Sculpt Mode only, when turned on)
 
 | Action | Keys |
 |---|---|
@@ -48,7 +49,7 @@ Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt K
 | Subdivision up / down, Divide | D / Shift + D, Ctrl + D |
 | Sculpt menu | Space |
 
-Each group of keys can be turned off in the preferences.
+Turn the keys on or off, and each group of them, in the preferences.
 
 ## Compatibility
 
@@ -65,7 +66,7 @@ tools/install.sh    # install the newest zip (Blender must be closed)
 
 These use `/Applications/Blender.app`; set `BLENDER` to use another. Some brushes are built from files not in this repository (`brush_sources/`); without them the build leaves those brushes out, but the committed library in `sculpt_kit/assets/` has them all.
 
-To tune a brush, turn on **Brush tuning (for development)** in the preferences, adjust the brush in Blender, press **Copy Tuning** in the Sculpt Kit tab, paste the block into `tuning/brushes.toml`, then build and install.
+To tune a brush, turn on **Brush tuning (for development)** in the preferences, adjust the brush in Blender, press **Copy Brush Settings** in the Sculpt Kit tab, paste the block into `tuning/brushes.toml`, then build and install.
 
 ## License
 

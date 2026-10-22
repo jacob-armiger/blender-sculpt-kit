@@ -2,7 +2,7 @@
 #
 # After a pen session:
 #   1. In Blender, adjust a brush until it feels right.
-#   2. Press "Copy Tuning" in the Sculpt Kit sidebar tab (Sculpt Mode).
+#   2. Press "Copy Brush Settings" in the Sculpt Kit sidebar tab (Sculpt Mode).
 #   3. Paste the copied block below, replacing any earlier block for that brush.
 #   4. Run tools/build.sh, then tools/install.sh with Blender closed.
 #
@@ -16,7 +16,7 @@
 # strength = 0.6
 # use_pressure_size = true
 
-# Jacob's pen tuning, 2026-10-07, copied from Blender with Copy Tuning.
+# Jacob's pen tuning, 2026-10-07, copied from Blender with Copy Brush Settings.
 [brushes."Kingslien_Clay"]
 strength = 0.4313
 spacing = 5
@@ -47,7 +47,7 @@ falloff = [[0.0, 1.0], [1.0, 0.769]]
 pressure_size_curve = [[0.0, 0.25], [1.0, 1.0]]
 pressure_strength_curve = [[0.0, 0.117], [1.0, 1.0]]
 
-# Jacob's pen tuning, 2026-10-07, copied from Blender with Copy Tuning.
+# Jacob's pen tuning, 2026-10-07, copied from Blender with Copy Brush Settings.
 [brushes."Kingslien_Rake_V2"]
 strength = 0.3919
 spacing = 5

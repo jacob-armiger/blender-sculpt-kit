@@ -82,3 +82,23 @@ def remove_keymap_items(added):
         except (RuntimeError, ReferenceError):
             pass  # already gone with its keymap
     added.clear()
+
+
+def face_count(n):
+    """A face count as the panels show it: 1,234,567 as "1.2 M", 183,000 as "183 k"."""
+    if n >= 1_000_000:
+        return "%.1f M" % (n / 1_000_000)
+    if n >= 10_000:
+        return "%d k" % round(n / 1000)
+    return "{:,}".format(n)
+
+
+def info(layout, text, icon='NONE'):
+    """A line of status in a panel, dimmed so that it reads apart from the buttons and settings around it."""
+    row = layout.row()
+    row.active = False
+    row.label(text=text, icon=icon)
+
+
+def warning(layout, text):
+    layout.label(text=text, icon='ERROR')

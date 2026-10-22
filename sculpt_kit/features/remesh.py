@@ -37,10 +37,24 @@ def _scale_mesh(mesh, factor):
         mesh.update()
 
 
+def _has_multires(ob):
+    return any(m.type == 'MULTIRES' for m in ob.modifiers)
+
+
+def _can_remesh(cls, context):
+    ob = context.active_object
+    if ob is None or ob.type != 'MESH' or context.mode not in {'OBJECT', 'SCULPT'}:
+        return False
+    if _has_multires(ob):  # Blender's remeshers refuse a mesh with Multires levels
+        cls.poll_message_set("Apply or remove the Multires levels first")
+        return False
+    return True
+
+
 # ---------------------------------------------------------------- voxel remesh
 
 class SCULPTKIT_OT_voxel_remesh(bpy.types.Operator):
-    """Rebuild the mesh at an even density set by Resolution, the number of voxels along its longest side"""
+    """Rebuild the mesh evenly, as voxels: Resolution is how many fit across its longest side (Ctrl R)"""
     bl_idname = "sculptkit.voxel_remesh"
     bl_label = "Voxel Remesh"
     bl_options = {'REGISTER', 'UNDO'}
@@ -51,8 +65,7 @@ class SCULPTKIT_OT_voxel_remesh(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        ob = context.active_object
-        return ob is not None and ob.type == 'MESH' and context.mode in {'OBJECT', 'SCULPT'}
+        return _can_remesh(cls, context)
 
     def execute(self, context):
         mesh = context.active_object.data
@@ -99,15 +112,6 @@ def estimate_faces(mesh, resolution):
     if longest_side <= 0.0 or resolution <= 0:
         return None
     return round(FACES_PER_VOXEL_AREA * area / (longest_side / resolution) ** 2)
-
-
-def _count(n):
-    """1,234,567 as "1.2 M", 183,000 as "183 k"."""
-    if n >= 1_000_000:
-        return "%.1f M" % (n / 1_000_000)
-    if n >= 10_000:
-        return "%d k" % round(n / 1000)
-    return "{:,}".format(n)
 
 
 # ----------------------------------------------------------------- quad remesh
@@ -199,8 +203,7 @@ class SCULPTKIT_OT_quad_remesh(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        ob = context.active_object
-        return ob is not None and ob.type == 'MESH' and context.mode in {'OBJECT', 'SCULPT'}
+        return _can_remesh(cls, context)
 
     def execute(self, context):
         ob = context.active_object
@@ -231,7 +234,6 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_category = common.PANEL_CATEGORY
     bl_order = 4
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
@@ -240,30 +242,30 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
 
     def draw(self, context):
         scene, ob = context.scene, context.active_object
-        layout = self.layout
+        now = len(ob.data.polygons)
+        col = self.layout.column()
+        blocked = _has_multires(ob)
+        if blocked:
+            common.info(col, "Apply or remove Multires first", icon='INFO')
 
-        box = layout.box()
-        box.label(text="Voxel", icon='MOD_REMESH')
-        if any(m.type == 'MULTIRES' for m in ob.modifiers):
-            box.label(text="Apply or remove Multires first", icon='INFO')
-        else:
-            box.prop(scene, "sculpt_kit_remesh_resolution")
-            faces = estimate_faces(ob.data, scene.sculpt_kit_remesh_resolution)
-            if faces is not None:
-                now = len(ob.data.polygons)
-                row = box.row()
-                row.alignment = 'CENTER'
-                row.label(text="%s faces  \u2192  about %s" % (_count(now), _count(faces)))
-                if faces < 0.5 * now:
-                    row = box.row()
-                    row.alignment = 'CENTER'
-                    row.label(text="Loses fine detail", icon='ERROR')
-            box.operator(SCULPTKIT_OT_voxel_remesh.bl_idname, text="Remesh  (Ctrl R)")
+        row = col.row(align=True).split(factor=0.68, align=True)
+        row.enabled = not blocked
+        row.prop(scene, "sculpt_kit_remesh_resolution", text="Voxel")
+        row.operator(SCULPTKIT_OT_voxel_remesh.bl_idname, text="Remesh")
+        faces = None if blocked else estimate_faces(ob.data, scene.sculpt_kit_remesh_resolution)
+        if faces is not None:
+            common.info(col, "%s \u2192 about %s faces" % (common.face_count(now), common.face_count(faces)))
+            if faces < 0.5 * now:
+                common.warning(col, "Loses fine detail")
 
-        box = layout.box()
-        box.label(text="Quad", icon='MESH_GRID')
-        box.prop(scene, "sculpt_kit_quad_faces", slider=True)  # a drag across it covers the whole usual range
-        box.operator(SCULPTKIT_OT_quad_remesh.bl_idname, text="Remesh")
+        col.separator()
+        row = col.row(align=True).split(factor=0.68, align=True)
+        row.enabled = not blocked
+        row.prop(scene, "sculpt_kit_quad_faces", text="Quad", slider=True)  # a drag across covers the usual range
+        row.operator(SCULPTKIT_OT_quad_remesh.bl_idname, text="Remesh")
+        if not blocked:
+            common.info(col, "%s \u2192 about %s faces" % (common.face_count(now),
+                                                            common.face_count(scene.sculpt_kit_quad_faces)))
 
 
 _classes = (SCULPTKIT_OT_voxel_remesh, SCULPTKIT_OT_quad_remesh, SCULPTKIT_PT_remesh)

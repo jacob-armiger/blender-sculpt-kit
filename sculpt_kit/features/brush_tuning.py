@@ -1,8 +1,8 @@
 """Brush tuning helper for pen-testing rounds.
 
-Adjust a brush while sculpting, press Copy Tuning, and paste the block into
+Adjust a brush while sculpting, press Copy Brush Settings, and paste the block into
 tuning/brushes.toml. The next build bakes those values into the brush.
-Reset to Saved throws the adjustments away: the brush goes back to what its
+Revert Brush Changes throws the adjustments away: the brush goes back to what its
 library holds.
 """
 import bpy
@@ -15,9 +15,9 @@ def _brush(context):
 
 
 class SCULPTKIT_OT_copy_brush_tuning(bpy.types.Operator):
-    """Copy the active brush's settings as a block for tuning/brushes.toml"""
+    """Copy the active brush's settings to the clipboard, as a block to paste into tuning/brushes.toml"""
     bl_idname = "sculptkit.copy_brush_tuning"
-    bl_label = "Copy Tuning"
+    bl_label = "Copy Brush Settings"
 
     @classmethod
     def poll(cls, context):
@@ -31,10 +31,9 @@ class SCULPTKIT_OT_copy_brush_tuning(bpy.types.Operator):
 
 
 class SCULPTKIT_OT_reset_brush(bpy.types.Operator):
-    """Return the active brush to its saved settings, as its brush library holds them.
-Everything changed on it since it was picked is lost"""
+    """Undo every change made to the active brush, back to the settings it was installed with"""
     bl_idname = "sculptkit.reset_brush"
-    bl_label = "Reset to Saved"
+    bl_label = "Revert Brush Changes"
 
     @classmethod
     def poll(cls, context):
@@ -62,13 +61,12 @@ class SCULPTKIT_PT_brush_tuning(bpy.types.Panel):
     bl_order = 5
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        return _brush(context) is not None
-
     def draw(self, context):
         brush = _brush(context)
         col = self.layout.column()
+        if brush is None:
+            common.info(col, "Pick a brush in Sculpt Mode")
+            return
         col.label(text=brush.name, icon='BRUSH_DATA')
         col.prop(brush, "strength")
         col.prop(brush, "spacing")

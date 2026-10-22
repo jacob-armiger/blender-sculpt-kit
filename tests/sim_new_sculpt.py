@@ -157,7 +157,7 @@ def test(sim):
               close(bpy.context.active_object.location, (0, 0, 0)) and across(bpy.context.active_object, 2.0)
               and close(rv3d.view_matrix, view, 1e-6))
     only()
-    look((0.0, 0.0, 40.0), 5.0)
+    look((0.0, 0.0, 120.0), 5.0)  # far enough that the sphere is well under the smallest size the view keeps
     yield 0.5
     sim.call(bpy.ops.sculptkit.new_sculpt)
     yield 1.0

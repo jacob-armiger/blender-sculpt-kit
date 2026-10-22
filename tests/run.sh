@@ -50,6 +50,8 @@ if [ "$HEADLESS" -eq 1 ]; then
 fi
 
 if [ "$INTERACTIVE" -eq 1 ]; then
+    # Answer the welcome as someone who wants everything would, so it does not pop up during the tests.
+    "$BLENDER" -b --python-expr "import bpy; p = bpy.context.preferences.addons['bl_ext.user_default.sculpt_kit'].preferences; p.welcome_done = True; p.use_zbrush_keys = True; p.look_theme = True; p.look_style = 'ZBRUSH'; bpy.ops.wm.save_userpref()" >/dev/null 2>&1
     # A saved file to open, so Blender starts without its splash screen.
     "$BLENDER" -b --python-expr "import bpy; bpy.ops.wm.save_as_mainfile(filepath=r'$OUT/start.blend')" >/dev/null 2>&1
     for test in "$ROOT"/tests/sim_*.py; do

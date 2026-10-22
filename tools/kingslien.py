@@ -4,8 +4,8 @@ Reads the .ZBP files in brush_sources/kingslien, converts their alphas,
 settings and pressure curves, and writes a brush library of their own to
 brush_sources/kingslien_library. That folder is not in the repository and the
 add-on does not ship it: it is for Jacob's own Blender, added there as an asset
-library by hand. SculptKit_Clay, which the add-on does ship, is copied from its
-Clay. Called from build_assets.py; not run on its own.
+library by hand. The kit's own Clay V1 and Rake V2 are copies of these brushes
+as first converted (see build_assets.py). Called from build_assets.py; not run on its own.
 """
 import glob
 import math

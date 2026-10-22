@@ -28,12 +28,14 @@ Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt K
 
 | Brush | Good for |
 |---|---|
-| Clay | Adjusting forms |
+| Clay V1 | Blocking in forms |
+| Clay V2 | Adjusting forms |
 | Clay Rake V3 | Carving forms and creating a unifying texture |
 | Clay Soft | Polishing forms and softening transitions |
 | Clay Strips Copy | Blocking in planes and large forms |
 | Move | Pulling out limbs and big changes of shape |
 | Rake Dots | A finer texture |
+| Rake V2 | Roughing in forms with a raked texture |
 
 ### Keys (Sculpt Mode only, when turned on)
 

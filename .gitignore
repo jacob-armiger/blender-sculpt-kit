@@ -6,5 +6,5 @@ tests/out/
 build/
 dist/
 
-# ZBrush source brushes (purchased) and other people's alphas: kept locally, never committed
+# ZBrush source brushes, other people's alphas and the local Kingslien and Archive libraries: kept locally
 brush_sources/

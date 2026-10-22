@@ -277,18 +277,20 @@ def build_kit(tuning):
         set_preview(rake, alpha[::2, ::2])
         tune(rake, tuning)
 
-    # Clay: Clay Strips with a flat-topped stroke. It began as the ZBrush port of Ryan Kingslien's Clay, but
-    # what made it so is all in its block in tuning/brushes.toml (Jacob's pen tuning, falloff and pressure
-    # curves included), so it is built here on its own, with no ZBrush files needed.
+    # Clay V2: Clay Strips with a flat-topped stroke. It began as the ZBrush port of Ryan Kingslien's Clay (V1,
+    # below), but what made it so is all in its block in tuning/brushes.toml (Jacob's pen tuning, falloff and
+    # pressure curves included), so it is built here on its own, with no ZBrush files needed.
     sk_clay = clay_strips.copy()
-    sk_clay.name = "SculptKit_Clay"
+    sk_clay.name = "SculptKit_Clay_V2"
     as_asset(sk_clay, "Round clay brush that lays flat-topped strokes and covers what is under them. "
                       "Good for adjusting forms")
     set_preview(sk_clay, disc_image())
     tune(sk_clay, tuning)
 
-    # Archive: Kingslien's Clay as the port first converts it, before any pen tuning.
-    if not RELEASE and kingslien.available():
+    # Kingslien's Clay and rakes as the port first converts them, before any pen tuning. They go to the Archive
+    # library as they are; Clay and Rake V2 are also copied into the kit as Clay V1 and Rake V2 (Jacob's pick,
+    # 22 October), so these need the ZBrush files in brush_sources even for a release.
+    if kingslien.available():
         kingslien.build_brushes()
         original = bpy.data.brushes["Kingslien_Clay"]
         original.name = "SculptKit_Kingslien_Clay"
@@ -316,6 +318,22 @@ def build_kit(tuning):
                 rake.plane_trim = kingslien.param(z, 'OuterDepth') - kingslien.param(z, 'InnerDepth')
             kingslien.set_preview(rake, tines)
 
+        for source, name, description in (
+                ("SculptKit_Kingslien_Clay", "SculptKit_Clay_V1",
+                 "Round clay brush that builds up firmly and buries what is under it. Good for blocking in forms"),
+                ("SculptKit_Kingslien_Rake_V2", "SculptKit_Rake_V2",
+                 "Clay rake with three tines that follow the stroke. Good for roughing in forms with a raked texture")):
+            copy = bpy.data.brushes[source].copy()
+            copy.name = name
+            as_asset(copy, description)
+            stem = "Kingslien_Clay" if "Clay" in name else "Kingslien_Rake_V2"
+            alpha = kingslien.load_zbp(stem)
+            kingslien.set_preview(copy, kingslien.alpha_array(alpha) if "Clay" in name
+                                  else kingslien.adjusted_alpha(alpha, 512))
+            tune(copy, tuning)
+    else:
+        print("  left out SculptKit_Clay_V1 and SculptKit_Rake_V2: no ZBrush files in", kingslien.SRC)
+
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.data.objects.remove(ob)
     bpy.data.meshes.remove(mesh)
@@ -331,6 +349,10 @@ def build_kit(tuning):
         f.write("# Asset catalogs for Sculpt Kit's own brushes.\n\nVERSION 1\n\n"
                 "%s:%s:%s\n" % (KIT_CATALOG_ID, KIT_CATALOG, KIT_CATALOG))
     archive = {b for b in bpy.data.brushes if b.name in ARCHIVE}
+    if RELEASE:  # a release leaves the local Archive library as it is: it skips some of what goes there
+        for brush in archive:
+            bpy.data.brushes.remove(brush)
+        archive = set()
     if archive:
         os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
         with open(os.path.join(ARCHIVE_FOLDER, "blender_assets.cats.txt"), "w") as f:
@@ -355,7 +377,7 @@ def main():
     bpy.context.preferences.filepaths.save_version = 0  # no .blend1 backups next to the libraries
     tuning = load_tuning()
     if kingslien.available():
-        kingslien.build(lambda brush: tune(brush, tuning))  # first: SculptKit_Clay is copied out of it
+        kingslien.build(lambda brush: tune(brush, tuning))  # the local Kingslien library
     build_kit(tuning)
 
 

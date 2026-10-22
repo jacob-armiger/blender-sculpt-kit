@@ -79,8 +79,8 @@ pressure_size_curve = [[0.0, 0.25], [1.0, 1.0]]
 pressure_strength_curve = [[0.0, 0.117], [1.0, 1.0]]
 
 # Jacob's changes, 2026-10-22.
-# The kit's Clay: Kingslien_Clay's pen tuning above, standing on its own, with less smoothing.
-[brushes."SculptKit_Clay"]
+# The kit's Clay V2: Kingslien_Clay's pen tuning above, standing on its own, with less smoothing.
+[brushes."SculptKit_Clay_V2"]
 strength = 0.54
 spacing = 5
 hardness = 0.0

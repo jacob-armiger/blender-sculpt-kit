@@ -386,18 +386,19 @@ check("the kit has copies of Blender's Clay Strips and Clay (as Clay Soft)",
       kit_types)
 check("the add-on ships the Sculpt Kit brushes and nothing else",
       sorted(kit_types) == sorted([
-          "SculptKit_Clay", "SculptKit_Clay_Rake_V3", "SculptKit_Clay_Soft", "SculptKit_Clay_Strips_Copy",
-          "SculptKit_Move", "SculptKit_Rake_Dots"]), sorted(kit_types))
+          "SculptKit_Clay_V1", "SculptKit_Clay_V2", "SculptKit_Clay_Rake_V3", "SculptKit_Clay_Soft",
+          "SculptKit_Clay_Strips_Copy", "SculptKit_Move", "SculptKit_Rake_Dots", "SculptKit_Rake_V2"]),
+      sorted(kit_types))
 descriptions = {b.name: b.asset_data.description for b in dst.brushes}
 check("every description says what the brush is good for, without naming other programs, people or keys",
       all("Good for" in text for text in descriptions.values())
       and not any(word in text for text in descriptions.values()
                   for word in ("ZBrush", "Kingslien", "Discord", "Ctrl", "Alt ")), descriptions)
-sk_clay = next((b for b in dst.brushes if b.name == "SculptKit_Clay"), None)
+sk_clay = next((b for b in dst.brushes if b.name == "SculptKit_Clay_V2"), None)
 size_curve = sk_clay and [tuple(round(v, 3) for v in p.location) for p in sk_clay.curve_size.curves[0].points]
-check("SculptKit_Clay keeps a quarter of its size at the lightest pressure",
+check("SculptKit_Clay_V2 keeps a quarter of its size at the lightest pressure",
       sk_clay is not None and sk_clay.use_pressure_size and size_curve[0] == (0.0, 0.25), size_curve)
-check("SculptKit_Clay has Jacob's tuning",
+check("SculptKit_Clay_V2 has Jacob's tuning",
       sk_clay is not None and sk_clay.sculpt_brush_type == 'CLAY_STRIPS' and round(sk_clay.strength, 4) == 0.54
       and round(sk_clay.tip_roundness, 3) == 0.7, sk_clay and (sk_clay.strength, sk_clay.tip_roundness))
 move = next((b for b in dst.brushes if b.name == "SculptKit_Move"), None)

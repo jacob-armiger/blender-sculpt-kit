@@ -1,81 +1,72 @@
 # Sculpt Kit
 
-A Blender extension that makes sculpting in Blender feel like ZBrush. Every feature has its own switch.
+A Blender extension for sculptors: tuned clay and rake brushes, ZBrush-style navigation and keys, subtools, subdivision levels, a cleaner sculpting layout, and a reference view you can measure your sculpt against. Every feature can be turned on or off.
 
-Requires **Blender 5.2 or newer**. It is a personal kit: the Kingslien brushes use alphas taken from a purchased ZBrush brush set, so do not share the zip.
+Requires **Blender 5.2 or newer**.
 
-## Install on another Blender or another computer
+## Install
 
-Everything the kit needs (code, brushes, alphas, colour themes, the grey material) is inside one file: the newest `dist/sculpt_kit-<version>.zip`.
+1. Download `sculpt_kit-<version>.zip` from [Releases](../../releases).
+2. Drag it onto the Blender window, or use **Preferences > Get Extensions > Install from Disk** (menu at the top right).
+3. Make sure **Sculpt Kit** is enabled under **Preferences > Add-ons**.
 
-1. Copy that zip to the other machine.
-2. Either drag the zip onto the Blender window and confirm, or use Preferences > Get Extensions > the arrow menu at the top right > Install from Disk.
-3. Make sure it is ticked under Preferences > Add-ons > Sculpt Kit.
+Disabling or uninstalling the kit puts Blender's own theme, keys and brush bar back.
 
-Your switches and choices (style, material, which features are on) are stored in each Blender's own preferences, so they do not travel with the zip. A fresh install starts with everything on, in the ZBrush style.
+Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt Kit** tab of the viewport sidebar (N), and brushes in the **Sculpt Kit** tab of the brush shelf.
 
-To update, install a newer zip the same way. To remove it, untick or uninstall it in Preferences; that puts your own theme back.
+## Features
 
-## What is in it
+- **Reference view:** compare your sculpt side by side with a reference, at the same view and scale
+- **New Sculpt:** spawn a sphere, rounded cube or thin armature cylinder ready to sculpt
+- **Subtools:** switch between, hide and organize the meshes in your scene
+- **Subdivide:** quick access to Multires and subdivision while you sculpt
+- **Remesh:** DynaMesh-style voxel remeshing by resolution, and self-repairing quad remeshing
+- **Optional Zbrush-like UI and key bindings:** a KlaySculpt or ZBrush color theme, layout, brush bar and materials
 
-All switches are in Preferences > Add-ons > Sculpt Kit.
+### Brushes
 
-| Feature | What it does |
+| Brush | Good for |
 |---|---|
-| ZBrush navigation and keys | Sculpt Mode only: right-drag and empty-canvas navigation, Alt inverts, Ctrl masks, ZBrush hotkeys (S size, U strength, F frame, X symmetry, B brushes, D / Shift+D / Ctrl+D subdivision) |
-| ZBrush look | Colour theme (ZBrush or KlaySculpt style), ZBrush Layout button in the top bar, ZBrush-style brush bar and view switches, Subtools list, material (red wax, grey, brown clay). Each part has its own switch. As in ZBrush, the subtool you are working on stays in view: with its eye off, it hides when you pick another |
-| Move and rake brushes | Move that grabs through the whole model; a five-dot clay rake built on Blender's Clay brush, with settings and alpha shared on Discord; Clay Rake V3, which lays flat strips like Clay Strips with three thin, square-cut spines and wide, shallow grooves; SculptKit_Clay, a copy of Kingslien_Clay with the pen tuning; and plain copies of Blender's Clay Strips (Clay Strips Copy) and Clay (Clay Soft) |
-| Kingslien brushes | Clay, Rake V2, HairTexture, Knife, KnifeSoft, ported from Ryan Kingslien's ZBrush brushes. Clay and Rake V2 are tuned with the pen against strokes made in ZBrush |
-| Synced reference view | Splits the viewport: reference on the left, sculpt on the right, both kept on the same view and the same frame, level with each other. Matching Edges dims whatever one half shows and the other does not, so the edge of the picture can be measured against like calipers |
-| New sculpt sphere, cube or cylinder | Quad sphere, cube with its edges and corners shaved off, or thin cylinder with rounded ends for laying out an armature, at about 25 thousand faces (Divide adds more), in quads or triangles, in Sculpt Mode, viewport set up. The cylinder is 2 units tall and 0.2 across; its Radius and Length can be changed right after adding it. The cube's Rounding can be changed right after adding it. Every shape is the size of Blender's starting cube, 2 units across. The first goes to the centre of the scene and Blender's untouched starting cube is hidden to make room. One added to a sculpt goes on the surface in the middle of the view. The view only moves when it does not already show the sphere |
-| Remesh tools | Voxel Remesh by resolution on Ctrl+R; Quad Remesh that repairs the mesh first |
-| Subdivide | Sidebar panel like ZBrush's Geometry menu: Divide (Ctrl+D, adds Multires), Lower / Higher, SDiv, Delete Higher, Apply, Remove; Subdivide Mesh smooths the mesh one level with no modifier |
-| Brush tuning helper | Copy Tuning copies the active brush's settings; Reset to Saved returns the brush to the settings in its library |
+| Clay | Adjusting forms |
+| Clay Rake V3 | Carving forms and creating a unifying texture |
+| Clay Soft | Polishing forms and softening transitions |
+| Clay Strips Copy | Blocking in planes and large forms |
+| Move | Pulling out limbs and big changes of shape |
+| Rake Dots | A finer texture |
 
-The panels are in the 3D viewport sidebar (N), in the Sculpt Kit tab. The brushes are in the Sculpt Mode brush shelf.
+### Keys (Sculpt Mode only)
 
-## Working on the kit
-
-Run these from the project folder. They use `/Applications/Blender.app`; set `BLENDER` to use another.
-
-```bash
-tools/build.sh
-```
-
-Builds the brush libraries, colour themes and grey material, and writes the zip to `dist/`. It stops if any step fails.
-
-```bash
-tests/run.sh
-```
-
-Runs every check in a throwaway Blender profile (`.test-profile`), so your own preferences are never touched. Blender windows open and close by themselves while it runs. `tests/run.sh --headless` skips those; `tests/run.sh sim_reference_view` runs one interactive test.
-
-```bash
-tools/install.sh
-```
-
-Installs the newest zip into this machine's Blender. Blender must be closed.
-
-Bump `version` in `sculpt_kit/blender_manifest.toml` before building a new release.
-
-## Where things are
-
-| Path | Contents |
+| Action | Keys |
 |---|---|
-| `sculpt_kit/` | The extension itself. `features/` has one module per feature |
-| `sculpt_kit/assets/` | Built brush libraries and the grey matcap (generated; do not edit by hand) |
-| `tools/` | Build scripts: `build_assets.py` (kit brushes), `kingslien.py` (ZBrush brush port), `build_theme.py` (colour styles), `build_matcap.py` (grey material) |
-| `brush_sources/kingslien/` | The original ZBrush `.ZBP` brush files |
-| `brush_sources/shared/` | Alphas other people shared: the five-dot rake's |
-| `tuning/brushes.toml` | Brush setting overrides from pen testing |
-| `tests/` | Headless checks and simulated-input tests |
-| `dist/` | Built zips |
+| Rotate / move / zoom | Right-drag / Alt + right-drag / Ctrl + right-drag, or drag on empty canvas |
+| Invert the brush | Alt + drag |
+| Mask / erase mask | Ctrl + drag / Ctrl + Alt + drag |
+| Invert mask / box mask | Ctrl + click / Ctrl + drag on empty canvas |
+| Size / strength | S / U |
+| Frame / wireframe / perspective | F / Shift + F / P |
+| Symmetry / brush picker | X / B |
+| Subdivision up / down, Divide | D / Shift + D, Ctrl + D |
+| Sculpt menu | Space |
 
-## Tuning
+Each group of keys can be turned off in the preferences.
 
-- **A brush:** adjust it in Blender, press Copy Tuning in the Sculpt Kit tab, paste the block into `tuning/brushes.toml` in place of any earlier block for that brush, then build and install. Copy before quitting Blender: changes to a brush last only for the session. Reset to Saved throws them away.
-- **Clay and Rake V2:** their blocks in `tuning/brushes.toml` are the pen tuning; the reasons for the settings underneath are in the comments in `tools/kingslien.py`.
-- **Colours:** edit the `STYLES` table in `tools/build_theme.py`.
-- **Grey material:** edit the numbers at the top of `tools/build_matcap.py`.
-- **Rake shape:** `rake_alpha` in `tools/kingslien.py`: `RAKE_NOTCHES` is where the tines meet, `RAKE_CROWN` how domed each tine is.
-- **Size of a new sphere, cube or cylinder, and the cube's rounding:** the defaults of `radius`, `length` and `rounding` (the cylinder's 0.1 radius is set in `execute`) in `sculpt_kit/features/sculpt_session.py`.
+## Compatibility
+
+- The color theme changes Blender's preferences, including Region Overlap, which affects every editor. Your own settings come back when you turn it off.
+- If another add-on also changes Sculpt Mode keys, one of the two may take priority.
+
+## Building from source
+
+```bash
+tools/build.sh      # build the zip into dist/
+tests/run.sh        # run the tests in a throwaway profile (--headless to skip the interactive ones)
+tools/install.sh    # install the newest zip (Blender must be closed)
+```
+
+These use `/Applications/Blender.app`; set `BLENDER` to use another. Some brushes are built from files not in this repository (`brush_sources/`); without them the build leaves those brushes out, but the committed library in `sculpt_kit/assets/` has them all.
+
+To tune a brush, turn on **Brush tuning (for development)** in the preferences, adjust the brush in Blender, press **Copy Tuning** in the Sculpt Kit tab, paste the block into `tuning/brushes.toml`, then build and install.
+
+## License
+
+GPL-3.0-or-later.

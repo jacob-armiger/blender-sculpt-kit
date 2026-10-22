@@ -70,6 +70,46 @@ class SCULPTKIT_OT_voxel_remesh(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# Faces a voxel remesh gives per (surface area / voxel size squared): measured on a sphere, a subdivided
+# Suzanne and a thin cylinder (1.3 to 1.5); flat-sided shapes give about 1.0. Sculpts are mostly curved.
+FACES_PER_VOXEL_AREA = 1.4
+_measured = {}  # mesh pointer -> (vertex count, face count, when, surface area, longest side)
+
+
+def _measure(mesh):
+    """The mesh's surface area and longest side. On a dense sculpt reading every face takes a tenth of a second
+    and the panel is drawn often, so they are worked out again only when the mesh gains or loses faces (a remesh,
+    Divide, Dyntopo), and then no more than every few seconds. Sculpting alone changes them too little to matter."""
+    import time
+    key, now = mesh.as_pointer(), time.monotonic()
+    known = _measured.get(key)
+    if known and (known[:2] == (len(mesh.vertices), len(mesh.polygons)) or now - known[2] < 3.0):
+        return known[3:]
+    area = np.empty(len(mesh.polygons), dtype=np.float32)
+    mesh.polygons.foreach_get("area", area)
+    co = _coordinates(mesh)
+    measured = (float(area.sum()), float(np.ptp(co, axis=0).max()) if len(co) else 0.0)
+    _measured[key] = (len(mesh.vertices), len(mesh.polygons), now) + measured
+    return measured
+
+
+def estimate_faces(mesh, resolution):
+    """About how many faces Voxel Remesh would give at this resolution, or None."""
+    area, longest_side = _measure(mesh)
+    if longest_side <= 0.0 or resolution <= 0:
+        return None
+    return round(FACES_PER_VOXEL_AREA * area / (longest_side / resolution) ** 2)
+
+
+def _count(n):
+    """1,234,567 as "1.2 M", 183,000 as "183 k"."""
+    if n >= 1_000_000:
+        return "%.1f M" % (n / 1_000_000)
+    if n >= 10_000:
+        return "%d k" % round(n / 1000)
+    return "{:,}".format(n)
+
+
 # ----------------------------------------------------------------- quad remesh
 
 def _inspect(mesh):
@@ -199,13 +239,31 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
         return ob is not None and ob.type == 'MESH'
 
     def draw(self, context):
-        scene = context.scene
-        col = self.layout.column()
-        col.prop(scene, "sculpt_kit_remesh_resolution")
-        col.operator(SCULPTKIT_OT_voxel_remesh.bl_idname, text="Voxel Remesh (Ctrl R)", icon='MOD_REMESH')
-        col.separator()
-        col.prop(scene, "sculpt_kit_quad_faces", slider=True)  # a drag across it covers the whole usual range
-        col.operator(SCULPTKIT_OT_quad_remesh.bl_idname, icon='MESH_GRID')
+        scene, ob = context.scene, context.active_object
+        layout = self.layout
+
+        box = layout.box()
+        box.label(text="Voxel", icon='MOD_REMESH')
+        if any(m.type == 'MULTIRES' for m in ob.modifiers):
+            box.label(text="Apply or remove Multires first", icon='INFO')
+        else:
+            box.prop(scene, "sculpt_kit_remesh_resolution")
+            faces = estimate_faces(ob.data, scene.sculpt_kit_remesh_resolution)
+            if faces is not None:
+                now = len(ob.data.polygons)
+                row = box.row()
+                row.alignment = 'CENTER'
+                row.label(text="%s faces  \u2192  about %s" % (_count(now), _count(faces)))
+                if faces < 0.5 * now:
+                    row = box.row()
+                    row.alignment = 'CENTER'
+                    row.label(text="Loses fine detail", icon='ERROR')
+            box.operator(SCULPTKIT_OT_voxel_remesh.bl_idname, text="Remesh  (Ctrl R)")
+
+        box = layout.box()
+        box.label(text="Quad", icon='MESH_GRID')
+        box.prop(scene, "sculpt_kit_quad_faces", slider=True)  # a drag across it covers the whole usual range
+        box.operator(SCULPTKIT_OT_quad_remesh.bl_idname, text="Remesh")
 
 
 _classes = (SCULPTKIT_OT_voxel_remesh, SCULPTKIT_OT_quad_remesh, SCULPTKIT_PT_remesh)
@@ -214,7 +272,8 @@ _classes = (SCULPTKIT_OT_voxel_remesh, SCULPTKIT_OT_quad_remesh, SCULPTKIT_PT_re
 def enable():
     bpy.types.Scene.sculpt_kit_remesh_resolution = IntProperty(
         name="Resolution", default=128, min=8, soft_max=1024, max=4096,
-        description="Voxels along the model's longest side for Voxel Remesh. Doubling it gives about four times the faces")
+        description="How many voxels fit across the model's longest side. Higher keeps finer detail; doubling it "
+                    "gives about four times the faces. The same value gives the same density on a model of any size")
     bpy.types.Scene.sculpt_kit_quad_faces = IntProperty(
         name="Quad Faces", default=5000, min=100, soft_max=100_000, max=2_000_000,
         description="Roughly how many faces Quad Remesh aims for. Drag across for up to 100 thousand, "
@@ -231,5 +290,6 @@ def disable():
     common.remove_keymap_items(_added)
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
+    _measured.clear()
     del bpy.types.Scene.sculpt_kit_remesh_resolution
     del bpy.types.Scene.sculpt_kit_quad_faces

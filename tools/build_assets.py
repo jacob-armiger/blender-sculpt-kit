@@ -1,12 +1,18 @@
-"""Build the brush libraries bundled with Sculpt Kit.
+"""Build the brush library bundled with Sculpt Kit.
 
     blender -b --factory-startup --python tools/build_assets.py
 
-Writes sculpt_kit/assets/kit (the kit's own brushes: Move, the five-dot rake, the clay rake, a copy of
-Kingslien_Clay and plain copies of Blender's Clay Strips and Clay) and
-sculpt_kit/assets/kingslien (the Kingslien pack, built from the ZBrush files
-in brush_sources/kingslien). Overrides from tuning/brushes.toml are applied to
-both, which is how pen-testing feedback gets baked in.
+Writes sculpt_kit/assets/kit/SculptKit_Brushes.blend, the brushes the add-on ships: clay, the clay rake,
+the thin-toothed and five-dot rakes, Move, and plain copies of Blender's Clay Strips and Clay. Overrides
+from tuning/brushes.toml are applied, which is how pen-testing feedback gets baked in.
+
+brush_sources/, which is not in the repository, holds the five-dot rake's alpha and the ZBrush files the
+Kingslien library is built from, for local use only (see kingslien.py). Without those files the brushes that
+need them are left out, with a note; the library in the repository has them.
+
+Archived brushes (earlier versions and the original conversions, kept to try out) go to a library of their
+own in brush_sources/archive_library, for local use only: added to Blender as an asset library by hand, it
+shows as an Archive tab. A release build (tools/build.sh --release, which sets SCULPTKIT_RELEASE=1) skips it.
 """
 import glob
 import os
@@ -26,6 +32,24 @@ ASSETS = os.path.join(PACKAGE, "assets")
 KIT_ALPHAS = os.path.join(ROOT, "build", "kit_alphas")  # intermediate; the images are packed into the .blend
 KIT_CATALOG_ID = "3c0d1a52-7e41-4b4e-8f6a-2d9b61c7a0e4"
 KIT_CATALOG = "Sculpt Kit"
+RELEASE = os.environ.get("SCULPTKIT_RELEASE") == "1"
+ARCHIVE = ("SculptKit_Kingslien_Clay", "SculptKit_Kingslien_Rake", "SculptKit_Kingslien_Rake_V2",
+           "SculptKit_Rake", "SculptKit_Rake_Fine")  # local only
+ARCHIVE_FOLDER = os.path.join(ROOT, "brush_sources", "archive_library")
+ARCHIVE_CATALOG_ID = "ac276eaf-4e68-47b2-9ef8-7c3ef3612b81"
+ARCHIVE_CATALOG = "Archive"
+DOTS_ALPHA = os.path.join(ROOT, "brush_sources", "shared", "rake_five_dots.png")
+
+# The thin-toothed rakes: name, number of teeth, how much of each tooth's share of the width is ridge, description.
+# Built in 0.3, dropped in 0.4.9, and brought back on 22 October at Jacob's request.
+RAKES = (
+    ("SculptKit_Rake", 5, 0.55,
+     "Clay rake with five thin teeth that follow the stroke. Good for a scratched finish on a medium mesh"),
+    ("SculptKit_Rake_Fine", 10, 0.5,
+     "Fine clay rake with ten teeth. Good for a wire-rake finish; needs a dense mesh to keep its lines"),
+)
+RAKE_FALLOFF = [(0.0, 1.0), (0.45, 1.0), (0.75, 0.45), (1.0, 0.0)]  # the outer teeth bite less than the middle ones
+RAKE_PRESSURE = [(0.0, 0.2), (1.0, 1.0)]  # share of the strength at the lightest touch and at full pressure
 
 def load_tuning():
     with open(os.path.join(ROOT, "tuning", "brushes.toml"), "rb") as f:
@@ -87,6 +111,33 @@ def raked_strip(centres=(-0.3625, 0.3625), groove=0.375, depth=0.4, wall=0.015, 
     return fade(x, 0.9 - closing, 0.97 - closing) * fade(y, 0.75, 0.98) * (1.0 - depth * cut)
 
 
+def disc_image(size=256):
+    """A round, flat-topped disc with a soft rim: the Clay brush's thumbnail."""
+    y, x = np.mgrid[0:size, 0:size]
+    r = np.hypot(x - (size - 1) / 2, y - (size - 1) / 2) / (size / 2)
+    t = np.clip((0.86 - r) / 0.2, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def thin_rake_alpha(teeth, ridge, size=512, margin=0.07, uneven=0.6, seed=7):
+    """A row of teeth across the stroke, the same all the way along it.
+
+    No real rake is perfect, so each tooth is a little off in height, width and
+    position. That keeps the marks from looking ruled. The same seed gives the
+    same teeth on every build.
+    """
+    rng = np.random.default_rng(seed)
+    across = (np.arange(size) + 0.5) / size
+    profile = np.zeros(size)
+    pitch = (1.0 - 2.0 * margin) / teeth
+    for k in range(teeth):
+        centre = margin + (k + 0.5) * pitch + rng.uniform(-1.0, 1.0) * uneven * pitch * 0.25
+        height = 1.0 - rng.uniform(0.0, 1.0) * uneven * 0.5
+        half_width = ridge * pitch * 0.5 * (1.0 + rng.uniform(-1.0, 1.0) * uneven * 0.3)
+        profile = np.maximum(profile, height * np.clip(1.0 - np.abs(across - centre) / half_width, 0.0, 1.0) ** 0.7)
+    return np.tile(profile, (size, 1))
+
+
 def as_asset(brush, description):
     brush.asset_clear()
     brush.asset_mark()
@@ -129,42 +180,45 @@ def build_kit(tuning):
     # Five-dot rake: a rake someone shared on Discord, built on Blender's Clay brush (not Clay Strips) with
     # an alpha of five soft dots in a row. Every setting below is theirs, read off their screenshots of the
     # brush in Blender 5.2; their image is used as it is, so that it is read the way theirs was.
-    rake = clay.copy()
-    rake.name = "SculptKit_Rake_Dots"
-    as_asset(rake, "Clay rake with five round teeth that follow the stroke. Settings and alpha shared on Discord")
-    rake.size = 100
-    rake.use_locked_size = 'VIEW'
-    rake.strength = 0.5
-    rake.use_pressure_strength = True
-    rake.use_pressure_size = False
-    rake.direction = 'ADD'
-    rake.normal_radius_factor = 0.75
-    rake.hardness = 0.65
-    rake.auto_smooth_factor = 0.25
-    rake.use_inverse_smooth_pressure = True
-    rake.plane_offset = 0.4
-    rake.use_plane_trim = False
-    rake.use_accumulate = True
-    rake.use_frontface = False
-    rake.sculpt_plane = 'AREA'
-    rake.use_original_normal = False
-    rake.use_original_plane = False
-    rake.stroke_method = 'SPACE'
-    rake.spacing = 3
-    rake.use_scene_spacing = 'VIEW'
-    rake.use_space_attenuation = True
-    rake.jitter = 0.0
-    rake.input_samples = 1
-    rake.use_smooth_stroke = False
-    dots = bpy.data.images.load(os.path.join(ROOT, "brush_sources", "shared", "rake_five_dots.png"))
-    dots.name = "SculptKit_Rake_Dots_alpha"
-    dots.pack()
-    texture = bpy.data.textures.new("SculptKit_Rake_Dots_alpha", 'IMAGE')
-    texture.image = dots
-    kingslien.use_alpha_texture(rake, texture)
-    grey = np.array(dots.pixels[:]).reshape(dots.size[1], dots.size[0], -1)[::-2, ::2, 0]
-    set_preview(rake, grey)
-    tune(rake, tuning)
+    if not os.path.exists(DOTS_ALPHA):
+        print("  left out SculptKit_Rake_Dots: no", DOTS_ALPHA)
+    else:
+        rake = clay.copy()
+        rake.name = "SculptKit_Rake_Dots"
+        as_asset(rake, "Clay rake with five round teeth that follow the stroke. Good for a finer texture")
+        rake.size = 100
+        rake.use_locked_size = 'VIEW'
+        rake.strength = 0.5
+        rake.use_pressure_strength = True
+        rake.use_pressure_size = False
+        rake.direction = 'ADD'
+        rake.normal_radius_factor = 0.75
+        rake.hardness = 0.65
+        rake.auto_smooth_factor = 0.25
+        rake.use_inverse_smooth_pressure = True
+        rake.plane_offset = 0.4
+        rake.use_plane_trim = False
+        rake.use_accumulate = True
+        rake.use_frontface = False
+        rake.sculpt_plane = 'AREA'
+        rake.use_original_normal = False
+        rake.use_original_plane = False
+        rake.stroke_method = 'SPACE'
+        rake.spacing = 3
+        rake.use_scene_spacing = 'VIEW'
+        rake.use_space_attenuation = True
+        rake.jitter = 0.0
+        rake.input_samples = 1
+        rake.use_smooth_stroke = False
+        dots = bpy.data.images.load(DOTS_ALPHA)
+        dots.name = "SculptKit_Rake_Dots_alpha"
+        dots.pack()
+        texture = bpy.data.textures.new("SculptKit_Rake_Dots_alpha", 'IMAGE')
+        texture.image = dots
+        kingslien.use_alpha_texture(rake, texture)
+        grey = np.array(dots.pixels[:]).reshape(dots.size[1], dots.size[0], -1)[::-2, ::2, 0]
+        set_preview(rake, grey)
+        tune(rake, tuning)
 
     # Clay rake: Jacob asked on 21 October for a rake with the raked texture of a ZBrush figure study, meaty
     # enough to build small and medium forms, laying flat strips like Clay Strips with grooves through them.
@@ -174,7 +228,8 @@ def build_kit(tuning):
     # The spines' ends taper to points, so they thin out where a stroke starts and ends (asked for 22 October).
     pad = raked_strip()
     clay_rake.name = "SculptKit_Clay_Rake_V3"
-    as_asset(clay_rake, "Lays flat strips of clay like Clay Strips, with three thin, square-cut spines and wide, shallow grooves")
+    as_asset(clay_rake, "Lays flat strips of clay with three thin, square-cut spines. "
+                        "Good for carving forms and creating a unifying texture")
     clay_rake.tip_roundness = 0.4
     clay_rake.strength = 0.6
     clay_rake.use_accumulate = True
@@ -193,25 +248,73 @@ def build_kit(tuning):
     for base, name, description in (
             (clay_strips, "SculptKit_Clay_Strips_Copy",
              "Lays flat, square-edged strips of clay that build up in layers. Good for blocking in planes "
-             "and muscle masses.\nA copy of Blender's Clay Strips"),
+             "and large forms.\nA copy of Blender's Clay Strips"),
             (clay, "SculptKit_Clay_Soft",
-             "Builds soft, rounded volume quickly. Good for bulking out masses and filling in between forms.\n"
-             "A copy of Blender's Clay brush")):
+             "Builds soft, rounded volume. Good for polishing forms and softening the transitions between "
+             "them.\nA copy of Blender's Clay brush")):
         brush = base.copy()
         brush.name = name
         as_asset(brush, description)
         tune(brush, tuning)
 
-    # A copy of Kingslien_Clay as Jacob tuned it, under the kit's name. The Kingslien library is built first,
-    # so this is taken from it with that tuning already applied.
-    with bpy.data.libraries.load(os.path.join(ASSETS, "kingslien", "Kingslien_Brushes.blend")) as (_src, dst):
-        dst.brushes = ["Kingslien_Clay"]
-    sk_clay = dst.brushes[0]
+    for name, teeth, ridge, description in () if RELEASE else RAKES:
+        alpha = thin_rake_alpha(teeth, ridge)
+        rake = clay_strips.copy()
+        rake.name = name
+        as_asset(rake, description)
+        rake.tip_roundness = 0.0
+        rake.use_accumulate = False  # one pass leaves one depth of mark, however long the stroke lingers
+        rake.strength = 0.45
+        rake.spacing = 1  # at Blender's usual 5 each dab shows, and a ridge reads as a zip rather than a line
+        rake.input_samples = 3
+        # A rake's teeth stay the same distance apart however hard it is pressed, so the pen sets
+        # only how deep they bite. With size on pressure the lines wander and break up.
+        rake.use_pressure_size = False
+        rake.use_pressure_strength = True
+        brush_settings.set_curve(rake.curve_strength, RAKE_PRESSURE)
+        brush_settings.set_falloff(rake, RAKE_FALLOFF)
+        kingslien.use_alpha_texture(rake, kingslien.make_texture(name + "_alpha", alpha, KIT_ALPHAS))
+        set_preview(rake, alpha[::2, ::2])
+        tune(rake, tuning)
+
+    # Clay: Clay Strips with a flat-topped stroke. It began as the ZBrush port of Ryan Kingslien's Clay, but
+    # what made it so is all in its block in tuning/brushes.toml (Jacob's pen tuning, falloff and pressure
+    # curves included), so it is built here on its own, with no ZBrush files needed.
+    sk_clay = clay_strips.copy()
     sk_clay.name = "SculptKit_Clay"
-    as_asset(sk_clay, "Round clay brush that lays flat-topped strokes and covers what is under them. Good for "
-                      "building up and blocking in forms")
-    kingslien.set_preview(sk_clay, kingslien.alpha_array(kingslien.load_zbp("Kingslien_Clay")))
+    as_asset(sk_clay, "Round clay brush that lays flat-topped strokes and covers what is under them. "
+                      "Good for adjusting forms")
+    set_preview(sk_clay, disc_image())
     tune(sk_clay, tuning)
+
+    # Archive: Kingslien's Clay as the port first converts it, before any pen tuning.
+    if not RELEASE and kingslien.available():
+        kingslien.build_brushes()
+        original = bpy.data.brushes["Kingslien_Clay"]
+        original.name = "SculptKit_Kingslien_Clay"
+        as_asset(original, "Kingslien's Clay as converted from ZBrush, before any pen tuning. "
+                           "Good for comparing against Clay")
+        kingslien.set_preview(original, kingslien.alpha_array(kingslien.load_zbp("Kingslien_Clay")))
+        # Archive: both of Kingslien's rakes as first converted (0.3.1): ZBrush's alpha as it is, before the
+        # notches and crown it was later reshaped with, at strength 0.5, with no pen tuning.
+        for stem in ("Kingslien_Rake", "Kingslien_Rake_V2"):
+            z = kingslien.load_zbp(stem)
+            tines = kingslien.adjusted_alpha(z, 512)
+            rake = clay_strips.copy()
+            rake.name = "SculptKit_" + stem
+            as_asset(rake, "%s as first converted from ZBrush: three tines, before any reshaping or pen tuning. "
+                           "Good for comparing against the kit's rakes" % stem.replace("_", " "))
+            rake.tip_roundness = 0.0
+            rake.use_accumulate = bool(z['params']['Buildup'][0][1])
+            rake.strength = 0.5
+            rake.spacing = 5
+            kingslien.pressure_curves(rake, z)
+            kingslien.set_falloff(rake, RAKE_FALLOFF)
+            kingslien.use_alpha_texture(rake, kingslien.make_texture(rake.name + "_alpha", tines, KIT_ALPHAS))
+            if z['params']['Depth Mask'][0][1]:  # V2 limits how far from the surface it works (ZBrush Depth Mask)
+                rake.use_plane_trim = True
+                rake.plane_trim = kingslien.param(z, 'OuterDepth') - kingslien.param(z, 'InnerDepth')
+            kingslien.set_preview(rake, tines)
 
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.data.objects.remove(ob)
@@ -227,6 +330,22 @@ def build_kit(tuning):
     with open(os.path.join(folder, "blender_assets.cats.txt"), "w") as f:
         f.write("# Asset catalogs for Sculpt Kit's own brushes.\n\nVERSION 1\n\n"
                 "%s:%s:%s\n" % (KIT_CATALOG_ID, KIT_CATALOG, KIT_CATALOG))
+    archive = {b for b in bpy.data.brushes if b.name in ARCHIVE}
+    if archive:
+        os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
+        with open(os.path.join(ARCHIVE_FOLDER, "blender_assets.cats.txt"), "w") as f:
+            f.write("# Asset catalogs for Sculpt Kit's archived brushes.\n\nVERSION 1\n\n"
+                    "%s:%s:%s\n" % (ARCHIVE_CATALOG_ID, ARCHIVE_CATALOG, ARCHIVE_CATALOG))
+        for brush in archive:
+            brush.asset_data.catalog_id = ARCHIVE_CATALOG_ID
+        archive_path = os.path.join(ARCHIVE_FOLDER, "Archive_Brushes.blend")
+        bpy.data.libraries.write(archive_path, archive, compress=True)
+        print("Saved", archive_path, sorted(b.name for b in archive))
+        for brush in archive:
+            bpy.data.brushes.remove(brush)
+    stale = os.path.join(folder, "SculptKit_Trial.blend")  # where 0.4.40's trial brushes went
+    if os.path.exists(stale):
+        os.remove(stale)
     path = os.path.join(folder, "SculptKit_Brushes.blend")
     bpy.ops.wm.save_as_mainfile(filepath=path, compress=True)
     print("Saved", path, [b.name for b in bpy.data.brushes])
@@ -235,8 +354,9 @@ def build_kit(tuning):
 def main():
     bpy.context.preferences.filepaths.save_version = 0  # no .blend1 backups next to the libraries
     tuning = load_tuning()
-    kingslien.build(lambda brush: tune(brush, tuning))
-    build_kit(tuning)  # second: it copies Kingslien_Clay out of the Kingslien library
+    if kingslien.available():
+        kingslien.build(lambda brush: tune(brush, tuning))  # first: SculptKit_Clay is copied out of it
+    build_kit(tuning)
 
 
 if __name__ == "__main__":

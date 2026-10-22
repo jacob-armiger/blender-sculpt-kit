@@ -5,3 +5,6 @@ __pycache__/
 tests/out/
 build/
 dist/
+
+# ZBrush source brushes (purchased) and other people's alphas: kept locally, never committed
+brush_sources/

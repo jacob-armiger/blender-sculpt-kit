@@ -1,8 +1,11 @@
 """Kingslien brush pack: Blender brushes that emulate Ryan Kingslien's ZBrush brushes.
 
 Reads the .ZBP files in brush_sources/kingslien, converts their alphas,
-settings and pressure curves, and writes the brush library that Sculpt Kit
-bundles. Called from build_assets.py; not run on its own.
+settings and pressure curves, and writes a brush library of their own to
+brush_sources/kingslien_library. That folder is not in the repository and the
+add-on does not ship it: it is for Jacob's own Blender, added there as an asset
+library by hand. SculptKit_Clay, which the add-on does ship, is copied from its
+Clay. Called from build_assets.py; not run on its own.
 """
 import glob
 import math
@@ -19,10 +22,15 @@ from zbp_reader import read_brush
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "brush_sources", "kingslien")
 ALPHAS = os.path.join(ROOT, "build", "kingslien_alphas")  # intermediate; the images are packed into the .blend
-OUT = os.path.join(ROOT, "sculpt_kit", "assets", "kingslien")
+OUT = os.path.join(ROOT, "brush_sources", "kingslien_library")
 CATALOG_ID = '6b1f4f0e-6a55-4b6e-9d0c-4b2a8f3c7e11'
 CATALOG = 'Kingslien'
 AUTHOR = 'Blender port of brushes by Ryan Kingslien'
+
+
+def available():
+    """Whether the ZBrush source files are here to build from."""
+    return os.path.isdir(SRC) and any(name.lower().endswith(".zbp") for name in os.listdir(SRC))
 
 
 # ---------------------------------------------------------------- ZBrush side

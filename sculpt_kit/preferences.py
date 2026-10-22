@@ -49,10 +49,8 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
     use_zbrush_keys: BoolProperty(name="ZBrush navigation and keys", default=True,
                                   update=_feature_switch("zbrush_keys"))
     use_zbrush_look: BoolProperty(name="ZBrush look", default=True, update=_look_switch)
-    use_kit_brushes: BoolProperty(name="Move and rake brushes", default=True,
+    use_kit_brushes: BoolProperty(name="Sculpt Kit brushes", default=True,
                                   update=_feature_switch("kit_brushes"))
-    use_kingslien_brushes: BoolProperty(name="Kingslien brushes", default=True,
-                                        update=_feature_switch("kingslien_brushes"))
     use_reference_view: BoolProperty(name="Synced reference view", default=True,
                                      update=_feature_switch("reference_view"))
     use_sculpt_session: BoolProperty(name="New sculpt sphere, cube or cylinder", default=True,
@@ -61,7 +59,7 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
                              update=_feature_switch("remesh"))
     use_subdivide: BoolProperty(name="Subdivide", default=True,
                                 update=_feature_switch("subdivide"))
-    use_brush_tuning: BoolProperty(name="Brush tuning helper", default=True,
+    use_brush_tuning: BoolProperty(name="Brush tuning (for development)", default=False,
                                    update=_feature_switch("brush_tuning"))
 
     remesh_canvas_gesture: BoolProperty(
@@ -86,7 +84,7 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
 
     # The ZBrush look: its style, and the parts that can be switched separately.
     look_style: EnumProperty(
-        name="Style", items=LOOK_STYLES, default='ZBRUSH', update=_look_style,
+        name="Style", items=LOOK_STYLES, default='KLAY', update=_look_style,
         description="Which program the colour theme and the material take after")
     look_theme: BoolProperty(
         name="Colour theme", default=True, update=_look_part,
@@ -113,6 +111,7 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
         description="What new sculpts and the ZBrush layout start in while the style is KlaySculpt")
     # What the colour theme replaced, as JSON, for putting it back.
     look_theme_backup: StringProperty(options={'HIDDEN'})
+    look_theme_applied: StringProperty(options={'HIDDEN'})  # which version of the style was last put on
 
     def draw(self, _context):
         from .features import FEATURES, zbrush_keys, zbrush_look

@@ -1,5 +1,8 @@
 """Interactive test: every Kingslien brush leaves the right kind of mark, and pen pressure never shrinks them to nothing.
 
+The Kingslien library is built locally into brush_sources/kingslien_library and not shipped with the add-on;
+the test adds it as an asset library itself, and is skipped where it has not been built.
+
 Also saves tests/out/kingslien_strokes.png, one stroke per brush from top to
 bottom, for a look at how they read.
 """
@@ -15,7 +18,8 @@ from mathutils import Euler, Vector  # noqa: E402
 
 import simlib  # noqa: E402
 
-LIBRARY = "Sculpt Kit Kingslien"
+LIBRARY = "Kingslien"
+FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "brush_sources", "kingslien_library")
 # brush -> what its stroke should do to a flat surface
 BRUSHES = (
     ("Kingslien_Clay", "raise"),
@@ -34,6 +38,14 @@ def activate(sim, name):
 
 
 def test(sim):
+    if not os.path.exists(os.path.join(FOLDER, "Kingslien_Brushes.blend")):
+        sim.check("skipped: the Kingslien library is not built here", True)
+        return
+    libraries = bpy.context.preferences.filepaths.asset_libraries
+    if libraries.get(LIBRARY) is None:
+        libraries.new(name=LIBRARY, directory=FOLDER)
+    sim.prefs.use_brush_tuning = True  # off by default; Reset to Saved is checked below
+    yield 1.0
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
     with sim.override():

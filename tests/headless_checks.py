@@ -80,12 +80,13 @@ prefs = addon.preferences
 kit = importlib.import_module(MODULE)
 assets = os.path.join(os.path.dirname(kit.__file__), "assets")
 kit_library = os.path.normpath(os.path.join(assets, "kit"))
-kingslien_library = os.path.normpath(os.path.join(assets, "kingslien"))
 
 # ---- defaults
-switches = ["use_zbrush_keys", "use_zbrush_look", "use_kit_brushes", "use_kingslien_brushes", "use_reference_view",
-            "use_sculpt_session", "use_remesh", "use_subdivide", "use_brush_tuning"]
-check("every feature is on by default", all(getattr(prefs, s) for s in switches))
+switches = ["use_zbrush_keys", "use_zbrush_look", "use_kit_brushes", "use_reference_view",
+            "use_sculpt_session", "use_remesh", "use_subdivide"]
+check("every feature is on by default, but for brush tuning, which is for development",
+      all(getattr(prefs, s) for s in switches) and not prefs.use_brush_tuning)
+prefs.use_brush_tuning = True  # the checks below expect every feature on
 LOOK_CLASSES = ("SCULPTKIT_OT_zbrush_layout", "SCULPTKIT_OT_brush_direction", "SCULPTKIT_PT_material",
                 "SCULPTKIT_OT_material",
                 "SCULPTKIT_OT_subtool_select", "SCULPTKIT_OT_subtool_show", "SCULPTKIT_OT_subtool_duplicate",
@@ -174,17 +175,29 @@ def same_value(a, b):
 
 
 parts = ["look_theme", "look_layout", "look_shelf", "look_subtools", "look_material"]
-check("every part of the look is on by default, in the ZBrush style",
-      all(getattr(prefs, p) for p in parts) and prefs.look_style == 'ZBRUSH', prefs.look_style)
+check("every part of the look is on by default, in the KlaySculpt style",
+      all(getattr(prefs, p) for p in parts) and prefs.look_style == 'KLAY' and theme.wearing() == 'KLAY', prefs.look_style)
+prefs.look_style = 'ZBRUSH'  # the checks below start from the ZBrush style
 check("the two styles are told apart", len(zbrush) > 200 and len(klay) > 200
       and sum(zbrush[p] == klay[p] for p in zbrush if p in klay) < 10)
 check("the ZBrush colour theme is in place", theme.wearing() == 'ZBRUSH' and in_place(zbrush), theme.wearing())
 check("what it replaced is kept with the preferences", set(saved()) == set(zbrush)
       and saved()["system.use_region_overlap"] is True, len(saved()))
-check("ZBrush colours: solid shelves, orange highlights, a canvas fading from black to grey",
-      not preferences.system.use_region_overlap and gradients.background_type == 'LINEAR'
+check("ZBrush colours: shelves floating over the canvas, orange highlights, a canvas fading from black to grey",
+      preferences.system.use_region_overlap and gradients.background_type == 'LINEAR'
       and rgb(gradients.high_gradient) == (0.0, 0.0, 0.0) and rgb(ui.wcol_tool.inner_sel) == (0.94, 0.44, 0.0),
       (gradients.background_type, rgb(ui.wcol_tool.inner_sel)))
+
+theme_module = importlib.import_module(MODULE + ".features.zbrush_look.theme")
+preferences.system.use_region_overlap = False
+prefs.look_theme_applied = "an older kit"
+theme_module.enable()
+check("a newer kit's changes to the style go on over the one already worn", preferences.system.use_region_overlap
+      and theme_module.wearing() == 'ZBRUSH')
+preferences.system.use_region_overlap = False
+theme_module.enable()
+check("but with the same kit, what was changed by hand since stays", not preferences.system.use_region_overlap)
+preferences.system.use_region_overlap = True
 
 prefs.look_style = 'KLAY'
 check("the KlaySculpt style replaces it", theme.wearing() == 'KLAY' and in_place(klay), theme.wearing())
@@ -335,16 +348,14 @@ check("back on, it leaves out a part that is switched off", theme.wearing() is N
 prefs.look_theme = True
 check("the whole look is back", theme.wearing() == 'ZBRUSH' and all(registered(cls) for cls in LOOK_CLASSES))
 
-# ---- brush libraries
-check("Move brush library listed", kit_library in library_paths())
-check("Kingslien library listed", kingslien_library in library_paths())
+# ---- brush library
+check("the brush library is listed", kit_library in library_paths())
 prefs.use_kit_brushes = False
-check("Move brush library switches off alone", kit_library not in library_paths() and kingslien_library in library_paths())
+check("and switches off", kit_library not in library_paths())
+bpy.context.preferences.filepaths.asset_libraries.new(name="Sculpt Kit Kingslien", directory=assets)
 prefs.use_kit_brushes = True
-prefs.use_kingslien_brushes = False
-check("Kingslien library switches off alone", kingslien_library not in library_paths() and kit_library in library_paths())
-prefs.use_kingslien_brushes = True
-check("both libraries back", kit_library in library_paths() and kingslien_library in library_paths())
+check("and back on, taking away the separate library of versions before 0.5", kit_library in library_paths()
+      and "Sculpt Kit Kingslien" not in [lib.name for lib in bpy.context.preferences.filepaths.asset_libraries])
 
 with bpy.data.libraries.load(os.path.join(kit_library, "SculptKit_Brushes.blend"), assets_only=True) as (src, dst):
     dst.brushes = list(src.brushes)
@@ -368,9 +379,21 @@ kit_types = {b.name: b.sculpt_brush_type for b in dst.brushes}
 check("the kit has copies of Blender's Clay Strips and Clay (as Clay Soft)",
       kit_types.get("SculptKit_Clay_Strips_Copy") == 'CLAY_STRIPS' and kit_types.get("SculptKit_Clay_Soft") == 'CLAY',
       kit_types)
+check("the add-on ships the Sculpt Kit brushes and nothing else",
+      sorted(kit_types) == sorted([
+          "SculptKit_Clay", "SculptKit_Clay_Rake_V3", "SculptKit_Clay_Soft", "SculptKit_Clay_Strips_Copy",
+          "SculptKit_Move", "SculptKit_Rake_Dots"]), sorted(kit_types))
+descriptions = {b.name: b.asset_data.description for b in dst.brushes}
+check("every description says what the brush is good for, without naming other programs, people or keys",
+      all("Good for" in text for text in descriptions.values())
+      and not any(word in text for text in descriptions.values()
+                  for word in ("ZBrush", "Kingslien", "Discord", "Ctrl", "Alt ")), descriptions)
 sk_clay = next((b for b in dst.brushes if b.name == "SculptKit_Clay"), None)
-check("SculptKit_Clay is Kingslien_Clay with Jacob's tuning",
-      sk_clay is not None and sk_clay.sculpt_brush_type == 'CLAY_STRIPS' and round(sk_clay.strength, 4) == 0.4313
+size_curve = sk_clay and [tuple(round(v, 3) for v in p.location) for p in sk_clay.curve_size.curves[0].points]
+check("SculptKit_Clay keeps a quarter of its size at the lightest pressure",
+      sk_clay is not None and sk_clay.use_pressure_size and size_curve[0] == (0.0, 0.25), size_curve)
+check("SculptKit_Clay has Jacob's tuning",
+      sk_clay is not None and sk_clay.sculpt_brush_type == 'CLAY_STRIPS' and round(sk_clay.strength, 4) == 0.54
       and round(sk_clay.tip_roundness, 3) == 0.7, sk_clay and (sk_clay.strength, sk_clay.tip_roundness))
 move = next((b for b in dst.brushes if b.name == "SculptKit_Move"), None)
 check("Move brush is an asset in the kit library", move is not None)
@@ -378,16 +401,6 @@ if move is not None:
     check("Move brush grabs through the model", move.sculpt_brush_type == 'GRAB' and move.falloff_shape == 'PROJECTED',
           "%s %s" % (move.sculpt_brush_type, move.falloff_shape))
 
-
-with bpy.data.libraries.load(os.path.join(kingslien_library, "Kingslien_Brushes.blend"), assets_only=True) as (src, dst):
-    dst.brushes = list(src.brushes)
-names = sorted(b.name for b in dst.brushes)
-check("five Kingslien brushes bundled, Rake V2 the only rake", len(names) == 5
-      and [n for n in names if "Rake" in n] == ["Kingslien_Rake_V2"], names)
-clay = next(b for b in dst.brushes if b.name == "Kingslien_Clay")
-size_curve = [tuple(round(v, 3) for v in p.location) for p in clay.curve_size.curves[0].points]
-check("Clay keeps a quarter of its size at the lightest pressure", clay.use_pressure_size and size_curve[0] == (0.0, 0.25),
-      size_curve)
 
 # ---- the other switches
 prefs.use_reference_view = False
@@ -576,6 +589,16 @@ for radius in (0.05, 1.0, 20.0):
     bpy.ops.sculptkit.voxel_remesh(resolution=64)
     counts.append(len(target.data.polygons))
 check("Voxel Remesh gives the same density at any model size", max(counts) < 1.1 * min(counts), counts)
+remesh_module = importlib.import_module(MODULE + ".features.remesh")
+bpy.ops.mesh.primitive_monkey_add()
+monkey = bpy.context.active_object
+bpy.ops.object.modifier_add(type='SUBSURF')
+bpy.ops.object.modifier_apply(modifier="Subdivision")
+guess = remesh_module.estimate_faces(monkey.data, 128)
+bpy.ops.sculptkit.voxel_remesh(resolution=128)
+check("the panel's face estimate is within a fifth of what Voxel Remesh gives", abs(guess - len(monkey.data.polygons))
+      < 0.2 * len(monkey.data.polygons), (guess, len(monkey.data.polygons)))
+bpy.data.objects.remove(monkey)
 
 target = sphere(1.0)
 mask = target.data.attributes.new(".sculpt_mask", 'FLOAT', 'POINT')
@@ -648,7 +671,7 @@ check("Quad Remesh works from Sculpt Mode and returns to it", 'FINISHED' in resu
 bpy.ops.object.mode_set(mode='OBJECT')
 addon_utils.disable(MODULE)
 check("disabling the extension removes everything",
-      not all_kit_keys() and kit_library not in library_paths() and kingslien_library not in library_paths()
+      not all_kit_keys() and kit_library not in library_paths()
       and not registered("SCULPTKIT_OT_new_sculpt") and not registered("SCULPTKIT_OT_quad_remesh")
       and not any(registered(cls) for cls in LOOK_CLASSES))
 check("and puts Blender's theme, brush bar and matcaps back", theme.wearing() is None and in_place(blender, styled)

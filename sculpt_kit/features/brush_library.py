@@ -1,8 +1,8 @@
-"""The bundled brush libraries.
+"""The bundled brush library.
 
-Each library is a folder under assets/ that is listed in Blender's asset
-libraries while its feature is on, which is what makes its brushes show up in
-the Sculpt Mode brush shelf.
+A folder under assets/ that is listed in Blender's asset libraries while the
+feature is on, which is what puts the Sculpt Kit tab in the Sculpt Mode brush
+shelf.
 """
 import os
 
@@ -11,7 +11,8 @@ import bpy
 ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
 
 KIT = ("Sculpt Kit", os.path.join(ASSETS, "kit"))
-KINGSLIEN = ("Sculpt Kit Kingslien", os.path.join(ASSETS, "kingslien"))
+# Versions before 0.5 kept the ported brushes in a library of their own. Its entry is taken away when found.
+RETIRED = ("Sculpt Kit Kingslien",)
 
 
 def _libraries():
@@ -27,29 +28,20 @@ def _has_brushes(path):
     return os.path.isdir(path) and any(name.endswith(".blend") for name in os.listdir(path))
 
 
-def _add(library):
-    name, path = library
+def _remove_retired():
+    for library in [lib for lib in _libraries() if lib.name in RETIRED]:
+        _libraries().remove(library)
+
+
+def enable():
+    _remove_retired()
+    name, path = KIT
     if _has_brushes(path) and _find(path) is None:
         _libraries().new(name=name, directory=path)
 
 
-def _remove(library):
-    found = _find(library[1])
+def disable():
+    _remove_retired()
+    found = _find(KIT[1])
     if found is not None:
         _libraries().remove(found)
-
-
-def enable_kit():
-    _add(KIT)
-
-
-def disable_kit():
-    _remove(KIT)
-
-
-def enable_kingslien():
-    _add(KINGSLIEN)
-
-
-def disable_kingslien():
-    _remove(KINGSLIEN)

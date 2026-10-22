@@ -1,7 +1,9 @@
 # Sculpt Kit
-
 A Blender extension for sculptors: tuned clay and rake brushes, ZBrush-style navigation/keybinds, subtools, subdivision levels, a cleaner sculpting layout, and a side-by-side reference view. Every feature can be turned on or off.
-<img width="2000" height="1100" alt="image" src="https://github.com/user-attachments/assets/1c4cebb4-51c9-4dc3-be4b-4f946a7ffe92" />
+
+<img width="1850" height="1047" alt="Screenshot 2026-10-22 at 7 41 46 PM" src="https://github.com/user-attachments/assets/db753586-4d60-4d77-994f-0786cc1f6e10" />
+
+
 
 ## Install
 

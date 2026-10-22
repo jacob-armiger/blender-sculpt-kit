@@ -1,74 +1,66 @@
 # Sculpt Kit
 
-A Blender extension for sculptors: tuned clay and rake brushes, ZBrush-style navigation and keys, subtools, subdivision levels, a cleaner sculpting layout, and a reference view you can measure your sculpt against. Every feature can be turned on or off.
-
-Requires **Blender 5.2 or newer**.
+A Blender extension for sculptors: tuned clay and rake brushes, ZBrush-style navigation/keybinds, subtools, subdivision levels, a cleaner sculpting layout, and a side-by-side reference view. Every feature can be turned on or off.
+<img width="2000" height="1100" alt="image" src="https://github.com/user-attachments/assets/1c4cebb4-51c9-4dc3-be4b-4f946a7ffe92" />
 
 ## Install
 
 1. Download `sculpt_kit-<version>.zip` from [Releases](../../releases).
-2. Drag it onto the Blender window, or use **Preferences > Get Extensions > Install from Disk** (menu at the top right).
-3. Make sure **Sculpt Kit** is enabled under **Preferences > Add-ons**.
-4. A welcome dialog asks whether you want the color theme and the ZBrush keys. Both stay off unless you pick them.
+2. Drag .zip file onto the Blender window
+3. Enable **Sculpt Kit** in **Edit > Preferences > Add-ons**, where feature toggles are also located
 
-Disabling or uninstalling the kit puts Blender's own theme, keys and brush bar back.
+Disabling or uninstalling the kit restores Blender's theme and UI immediately.
 
 Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt Kit** tab of the viewport sidebar (N), and brushes in the **Sculpt Kit** tab of the brush shelf.
 
 ## Features
 
 - **Reference view:** compare your sculpt side by side with a reference, at the same view and scale
-- **New Sculpt:** spawn a sphere, rounded cube or thin armature cylinder ready to sculpt
+- **Optional Zbrush-like UI and key bindings:** a KlaySculpt or ZBrush color theme, layout, brush bar and materials
+- **Spawn Sculpt-ready forms:** Sphere, cube, or cylinder made of quads
 - **Subtools:** switch between, hide and organize the meshes in your scene
 - **Subdivide:** quick access to Multires and subdivision while you sculpt
 - **Remesh:** DynaMesh-style voxel remeshing by resolution, and self-repairing quad remeshing
-- **Optional Zbrush-like UI and key bindings:** a KlaySculpt or ZBrush color theme, layout, brush bar and materials
 
 ### Brushes
 
-| Brush | Good for |
+| Brush | Effect |
 |---|---|
-| Clay V1 | Blocking in forms |
-| Clay V2 | Adjusting forms |
-| Clay Rake V2 | Roughing in forms with a raked texture |
-| Clay Rake V3 | Carving forms and creating a unifying texture |
-| Clay Soft | Polishing forms and softening transitions |
-| Clay Strips Copy | Blocking in planes and large forms |
-| Move | Pulling out limbs and big changes of shape |
-| Rake Dots | A finer texture |
+| Clay V1 | Piles up clay in strips. Good for blocking in forms |
+| Clay V2 | Lays down clay more gradually. Suited for adjusting masses |
+| Clay Rake V2 | Roughing in and unify surfaces with a raked texture |
+| Clay Rake V3 | A softer rake with more clay build up (I don't use this much) |
+| Clay Soft | Can be used for polishing forms and softening transitions (I barely use this) |
+| Clay Strips Copy | Lays down heavy strips of clay with harder edges. Doesn't accumulate as quickly as clay V1 |
+| Move | Can be used to extrude masses and make big adjustments to masses |
 
-### Keys (Sculpt Mode only, when turned on)
+<img width="302" height="400" alt="Screenshot 2026-10-22 at 6 25 50 PM" src="https://github.com/user-attachments/assets/d6dbc2e3-d0a4-41f2-b58b-f07d627f7c82" />  
+
+Sculpt made using these brushes
+
+### Keys (only takes affect in Sculpt Mode)
 
 | Action | Keys |
 |---|---|
-| Rotate / move / zoom | Right-drag / Alt + right-drag / Ctrl + right-drag, or drag on empty canvas |
-| Invert the brush | Alt + drag |
-| Mask / erase mask | Ctrl + drag / Ctrl + Alt + drag |
-| Invert mask / box mask | Ctrl + click / Ctrl + drag on empty canvas |
+| Rotate / move / zoom | Right drag / Alt+right drag / Ctrl+right-drag, or drag on empty canvas |
+| Invert the brush | Alt+drag |
+| Mask / erase mask | Ctrl+drag / Ctrl+Alt+drag |
+| Invert mask / box mask | Ctrl+click / Ctrl+drag on empty canvas |
 | Size / strength | S / U |
-| Frame / wireframe / perspective | F / Shift + F / P |
+| Frame / wireframe / perspective | F / Shift+F / P |
 | Symmetry / brush picker | X / B |
-| Subdivision up / down, Divide | D / Shift + D, Ctrl + D |
+| Subdivision up / down, Divide | D / Shift+D, Ctrl+D |
 | Sculpt menu | Space |
 
-Turn the keys on or off, and each group of them, in the preferences.
-
-## Compatibility
-
-- The color theme changes Blender's preferences, including Region Overlap, which affects every editor. Your own settings come back when you turn it off.
-- If another add-on also changes Sculpt Mode keys, one of the two may take priority.
+Keybinds can be turned on or off in Preferences.
 
 ## Building from source
-
+I've only tested in Blender 5.2.2
 ```bash
 tools/build.sh      # build the zip into dist/
 tests/run.sh        # run the tests in a throwaway profile (--headless to skip the interactive ones)
 tools/install.sh    # install the newest zip (Blender must be closed)
 ```
-
-These use `/Applications/Blender.app`; set `BLENDER` to use another. Some brushes are built from files not in this repository (`brush_sources/`); without them the build leaves those brushes out, but the committed library in `sculpt_kit/assets/` has them all.
-
-To tune a brush, turn on **Brush tuning (for development)** in the preferences, adjust the brush in Blender, press **Copy Brush Settings** in the Sculpt Kit tab, paste the block into `tuning/brushes.toml`, then build and install.
 
 ## License
 

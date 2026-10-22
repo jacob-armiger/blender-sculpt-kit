@@ -364,15 +364,6 @@ check("and back on, taking away the separate library of versions before 0.5", ki
 
 with bpy.data.libraries.load(os.path.join(kit_library, "SculptKit_Brushes.blend"), assets_only=True) as (src, dst):
     dst.brushes = list(src.brushes)
-dots = next((b for b in dst.brushes if b.name == "SculptKit_Rake_Dots"), None)
-check("the five-dot rake is in the kit library, on Blender's Clay brush, with its alpha following the stroke",
-      dots is not None and dots.sculpt_brush_type == 'CLAY' and dots.texture is not None and dots.texture_slot.use_rake
-      and dots.texture.image.size[:] == (512, 512), dots and dots.sculpt_brush_type)
-if dots is not None:
-    got = (dots.strength, dots.spacing, round(dots.hardness, 3), round(dots.auto_smooth_factor, 3),
-           round(dots.normal_radius_factor, 3), round(dots.plane_offset, 3), dots.use_accumulate, dots.use_pressure_strength,
-           dots.use_pressure_size, dots.use_inverse_smooth_pressure, dots.use_space_attenuation)
-    check("with the settings it was shared with", got == (0.5, 3, 0.65, 0.25, 0.75, 0.4, True, True, False, True, True), got)
 clay_rake = next((b for b in dst.brushes if b.name == "SculptKit_Clay_Rake_V3"), None)
 check("the clay rake is in the kit library, on Clay Strips, with its raked strip following the stroke",
       clay_rake is not None and clay_rake.sculpt_brush_type == 'CLAY_STRIPS' and clay_rake.texture is not None
@@ -386,7 +377,7 @@ check("the kit has copies of Blender's Clay Strips and Clay (as Clay Soft)",
 check("the add-on ships the Sculpt Kit brushes and nothing else",
       sorted(kit_types) == sorted([
           "SculptKit_Clay_V1", "SculptKit_Clay_V2", "SculptKit_Clay_Rake_V3", "SculptKit_Clay_Soft",
-          "SculptKit_Clay_Strips_Copy", "SculptKit_Move", "SculptKit_Rake_Dots", "SculptKit_Clay_Rake_V2"]),
+          "SculptKit_Clay_Strips_Copy", "SculptKit_Move", "SculptKit_Clay_Rake_V2"]),
       sorted(kit_types))
 descriptions = {b.name: b.asset_data.description for b in dst.brushes}
 check("every description says what the brush is good for, without naming other programs, people or keys",

@@ -42,7 +42,7 @@ GROUPS = {
     "SculptKit_Clay_Soft": CLAY_CATALOG_ID, "SculptKit_Clay_Strips_Copy": CLAY_CATALOG_ID,
     "SculptKit_Clay_V1": CLAY_CATALOG_ID, "SculptKit_Clay_V2": CLAY_CATALOG_ID,
     "SculptKit_Clay_Rake_V2": RAKES_CATALOG_ID, "SculptKit_Clay_Rake_V3": RAKES_CATALOG_ID,
-    "SculptKit_Rake_Dots": RAKES_CATALOG_ID, "SculptKit_Move": SHAPE_CATALOG_ID,
+    "SculptKit_Move": SHAPE_CATALOG_ID,
 }
 RELEASE = os.environ.get("SCULPTKIT_RELEASE") == "1"
 ARCHIVE = ("SculptKit_Kingslien_Clay", "SculptKit_Kingslien_Rake", "SculptKit_Kingslien_Rake_V2",
@@ -50,7 +50,6 @@ ARCHIVE = ("SculptKit_Kingslien_Clay", "SculptKit_Kingslien_Rake", "SculptKit_Ki
 ARCHIVE_FOLDER = os.path.join(ROOT, "brush_sources", "archive_library")
 ARCHIVE_CATALOG_ID = "ac276eaf-4e68-47b2-9ef8-7c3ef3612b81"
 ARCHIVE_CATALOG = "Archive"
-DOTS_ALPHA = os.path.join(ROOT, "brush_sources", "shared", "rake_five_dots.png")
 
 # The thin-toothed rakes: name, number of teeth, how much of each tooth's share of the width is ridge, description.
 # Built in 0.3, dropped in 0.4.9, and brought back on 22 October at Jacob's request.
@@ -188,49 +187,6 @@ def build_kit(tuning):
                    "Good for pulling out limbs and other forms, and for big changes of shape")
     set_preview(move, arrow_image())
     tune(move, tuning)
-
-    # Five-dot rake: a rake someone shared on Discord, built on Blender's Clay brush (not Clay Strips) with
-    # an alpha of five soft dots in a row. Every setting below is theirs, read off their screenshots of the
-    # brush in Blender 5.2; their image is used as it is, so that it is read the way theirs was.
-    if not os.path.exists(DOTS_ALPHA):
-        print("  left out SculptKit_Rake_Dots: no", DOTS_ALPHA)
-    else:
-        rake = clay.copy()
-        rake.name = "SculptKit_Rake_Dots"
-        as_asset(rake, "Clay rake with five round teeth that follow the stroke. Good for a finer texture")
-        rake.size = 100
-        rake.use_locked_size = 'VIEW'
-        rake.strength = 0.5
-        rake.use_pressure_strength = True
-        rake.use_pressure_size = False
-        rake.direction = 'ADD'
-        rake.normal_radius_factor = 0.75
-        rake.hardness = 0.65
-        rake.auto_smooth_factor = 0.25
-        rake.use_inverse_smooth_pressure = True
-        rake.plane_offset = 0.4
-        rake.use_plane_trim = False
-        rake.use_accumulate = True
-        rake.use_frontface = False
-        rake.sculpt_plane = 'AREA'
-        rake.use_original_normal = False
-        rake.use_original_plane = False
-        rake.stroke_method = 'SPACE'
-        rake.spacing = 3
-        rake.use_scene_spacing = 'VIEW'
-        rake.use_space_attenuation = True
-        rake.jitter = 0.0
-        rake.input_samples = 1
-        rake.use_smooth_stroke = False
-        dots = bpy.data.images.load(DOTS_ALPHA)
-        dots.name = "SculptKit_Rake_Dots_alpha"
-        dots.pack()
-        texture = bpy.data.textures.new("SculptKit_Rake_Dots_alpha", 'IMAGE')
-        texture.image = dots
-        kingslien.use_alpha_texture(rake, texture)
-        grey = np.array(dots.pixels[:]).reshape(dots.size[1], dots.size[0], -1)[::-2, ::2, 0]
-        set_preview(rake, grey)
-        tune(rake, tuning)
 
     # Clay rake: Jacob asked on 21 October for a rake with the raked texture of a ZBrush figure study, meaty
     # enough to build small and medium forms, laying flat strips like Clay Strips with grooves through them.

@@ -378,8 +378,7 @@ check("the clay rake is in the kit library, on Clay Strips, with its raked strip
       clay_rake is not None and clay_rake.sculpt_brush_type == 'CLAY_STRIPS' and clay_rake.texture is not None
       and clay_rake.texture_slot.use_rake and clay_rake.use_pressure_size and clay_rake.use_pressure_strength,
       clay_rake and clay_rake.sculpt_brush_type)
-check("the earlier clay rakes are gone",
-      not any(b.name in ("SculptKit_Clay_Rake", "SculptKit_Clay_Rake_V2") for b in dst.brushes))
+check("the first clay rake is gone", not any(b.name == "SculptKit_Clay_Rake" for b in dst.brushes))
 kit_types = {b.name: b.sculpt_brush_type for b in dst.brushes}
 check("the kit has copies of Blender's Clay Strips and Clay (as Clay Soft)",
       kit_types.get("SculptKit_Clay_Strips_Copy") == 'CLAY_STRIPS' and kit_types.get("SculptKit_Clay_Soft") == 'CLAY',
@@ -387,7 +386,7 @@ check("the kit has copies of Blender's Clay Strips and Clay (as Clay Soft)",
 check("the add-on ships the Sculpt Kit brushes and nothing else",
       sorted(kit_types) == sorted([
           "SculptKit_Clay_V1", "SculptKit_Clay_V2", "SculptKit_Clay_Rake_V3", "SculptKit_Clay_Soft",
-          "SculptKit_Clay_Strips_Copy", "SculptKit_Move", "SculptKit_Rake_Dots", "SculptKit_Rake_V2"]),
+          "SculptKit_Clay_Strips_Copy", "SculptKit_Move", "SculptKit_Rake_Dots", "SculptKit_Clay_Rake_V2"]),
       sorted(kit_types))
 descriptions = {b.name: b.asset_data.description for b in dst.brushes}
 check("every description says what the brush is good for, without naming other programs, people or keys",

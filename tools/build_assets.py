@@ -32,6 +32,18 @@ ASSETS = os.path.join(PACKAGE, "assets")
 KIT_ALPHAS = os.path.join(ROOT, "build", "kit_alphas")  # intermediate; the images are packed into the .blend
 KIT_CATALOG_ID = "3c0d1a52-7e41-4b4e-8f6a-2d9b61c7a0e4"
 KIT_CATALOG = "Sculpt Kit"
+# Sub-catalogs, so that the brushes group in the brush picker and in the shelf's Sculpt Kit tab: clay first, then
+# the rakes, then Move (Jacob's order, 22 October). The shelf lists a catalog's own brushes before its
+# sub-catalogs', which come in name order, and sorts by name within each.
+SHAPE_CATALOG_ID = "78ee2544-4ef6-4fb0-b510-a7df39259d8e"
+CLAY_CATALOG_ID = "135916c4-880f-4bfa-b2c0-7b9e7ca800d4"
+RAKES_CATALOG_ID = "2fb43b74-abfa-4da4-a8a7-397a4c22aae0"
+GROUPS = {
+    "SculptKit_Clay_Soft": CLAY_CATALOG_ID, "SculptKit_Clay_Strips_Copy": CLAY_CATALOG_ID,
+    "SculptKit_Clay_V1": CLAY_CATALOG_ID, "SculptKit_Clay_V2": CLAY_CATALOG_ID,
+    "SculptKit_Clay_Rake_V2": RAKES_CATALOG_ID, "SculptKit_Clay_Rake_V3": RAKES_CATALOG_ID,
+    "SculptKit_Rake_Dots": RAKES_CATALOG_ID, "SculptKit_Move": SHAPE_CATALOG_ID,
+}
 RELEASE = os.environ.get("SCULPTKIT_RELEASE") == "1"
 ARCHIVE = ("SculptKit_Kingslien_Clay", "SculptKit_Kingslien_Rake", "SculptKit_Kingslien_Rake_V2",
            "SculptKit_Rake", "SculptKit_Rake_Fine")  # local only
@@ -321,18 +333,18 @@ def build_kit(tuning):
         for source, name, description in (
                 ("SculptKit_Kingslien_Clay", "SculptKit_Clay_V1",
                  "Round clay brush that builds up firmly and buries what is under it. Good for blocking in forms"),
-                ("SculptKit_Kingslien_Rake_V2", "SculptKit_Rake_V2",
+                ("SculptKit_Kingslien_Rake_V2", "SculptKit_Clay_Rake_V2",
                  "Clay rake with three tines that follow the stroke. Good for roughing in forms with a raked texture")):
             copy = bpy.data.brushes[source].copy()
             copy.name = name
             as_asset(copy, description)
-            stem = "Kingslien_Clay" if "Clay" in name else "Kingslien_Rake_V2"
-            alpha = kingslien.load_zbp(stem)
-            kingslien.set_preview(copy, kingslien.alpha_array(alpha) if "Clay" in name
-                                  else kingslien.adjusted_alpha(alpha, 512))
+            if source == "SculptKit_Kingslien_Clay":
+                kingslien.set_preview(copy, kingslien.alpha_array(kingslien.load_zbp("Kingslien_Clay")))
+            else:
+                kingslien.set_preview(copy, kingslien.adjusted_alpha(kingslien.load_zbp("Kingslien_Rake_V2"), 512))
             tune(copy, tuning)
     else:
-        print("  left out SculptKit_Clay_V1 and SculptKit_Rake_V2: no ZBrush files in", kingslien.SRC)
+        print("  left out SculptKit_Clay_V1 and SculptKit_Clay_Rake_V2: no ZBrush files in", kingslien.SRC)
 
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.data.objects.remove(ob)
@@ -346,8 +358,10 @@ def build_kit(tuning):
     folder = os.path.join(ASSETS, "kit")
     os.makedirs(folder, exist_ok=True)
     with open(os.path.join(folder, "blender_assets.cats.txt"), "w") as f:
-        f.write("# Asset catalogs for Sculpt Kit's own brushes.\n\nVERSION 1\n\n"
-                "%s:%s:%s\n" % (KIT_CATALOG_ID, KIT_CATALOG, KIT_CATALOG))
+        f.write("# Asset catalogs for Sculpt Kit's own brushes.\n\nVERSION 1\n\n")
+        for catalog_id, path in ((KIT_CATALOG_ID, KIT_CATALOG), (CLAY_CATALOG_ID, KIT_CATALOG + "/Clay"),
+                                 (RAKES_CATALOG_ID, KIT_CATALOG + "/Rakes"), (SHAPE_CATALOG_ID, KIT_CATALOG + "/Shape")):
+            f.write("%s:%s:%s\n" % (catalog_id, path, path.replace("/", "-")))
     archive = {b for b in bpy.data.brushes if b.name in ARCHIVE}
     if RELEASE:  # a release leaves the local Archive library as it is: it skips some of what goes there
         for brush in archive:
@@ -368,6 +382,9 @@ def build_kit(tuning):
     stale = os.path.join(folder, "SculptKit_Trial.blend")  # where 0.4.40's trial brushes went
     if os.path.exists(stale):
         os.remove(stale)
+    for brush in bpy.data.brushes:
+        if brush.name in GROUPS:
+            brush.asset_data.catalog_id = GROUPS[brush.name]
     path = os.path.join(folder, "SculptKit_Brushes.blend")
     bpy.ops.wm.save_as_mainfile(filepath=path, compress=True)
     print("Saved", path, [b.name for b in bpy.data.brushes])

@@ -3,3 +3,6 @@
 VERSION 1
 
 3c0d1a52-7e41-4b4e-8f6a-2d9b61c7a0e4:Sculpt Kit:Sculpt Kit
+135916c4-880f-4bfa-b2c0-7b9e7ca800d4:Sculpt Kit/Clay:Sculpt Kit-Clay
+2fb43b74-abfa-4da4-a8a7-397a4c22aae0:Sculpt Kit/Rakes:Sculpt Kit-Rakes
+78ee2544-4ef6-4fb0-b510-a7df39259d8e:Sculpt Kit/Shape:Sculpt Kit-Shape

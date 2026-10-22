@@ -91,12 +91,15 @@ STYLES = {
             "view_3d.space.gradients.background_type": 'LINEAR',
             "view_3d.space.gradients.high_gradient": (0.0, 0.0, 0.0),
             "view_3d.space.gradients.gradient": (0.29, 0.29, 0.29),
-            # Solid shelves and trays beside the canvas, not panels floating over it.
+            # Shelves and trays float see-through over the canvas, which runs the full height of the viewport:
+            # Jacob measures against the window's edges, and in the reference view both halves then reach them.
+            # (Until 0.4.37 they sat solid beside the canvas.)
             "view_3d.space.header": (0.141, 0.141, 0.141, 1.0),
-            "regions.sidebars.back": (0.141, 0.141, 0.141, 1.0),
+            "regions.sidebars.back": (0.141, 0.141, 0.141, 0.8),
             "regions.sidebars.tab_back": (0.102, 0.102, 0.102, 1.0),
-            "regions.asset_shelf.back": (0.141, 0.141, 0.141, 1.0),
-            "/system.use_region_overlap": False,
+            "regions.asset_shelf.back": (0.141, 0.141, 0.141, 0.6),
+            "regions.asset_shelf.header_back": (0.141, 0.141, 0.141, 0.0),  # the kit draws the tabs' pane
+            "/system.use_region_overlap": True,
         },
     },
     "KLAY": {
@@ -120,11 +123,13 @@ STYLES = {
             "view_3d.space.gradients.background_type": 'LINEAR',
             "view_3d.space.gradients.high_gradient": (0.071, 0.137, 0.235),
             "view_3d.space.gradients.gradient": (0.059, 0.098, 0.176),
-            # Panels float over the canvas, nearly solid.
+            # Panels float over the canvas, nearly solid; the brush shelf see-through, so the canvas can be
+            # measured to the bottom of the window.
             "view_3d.space.header": (0.204, 0.204, 0.22, 0.6),
             "regions.sidebars.back": (0.188, 0.188, 0.204, 0.94),
             "regions.sidebars.tab_back": (0.157, 0.157, 0.173, 0.94),
-            "regions.asset_shelf.back": (0.22, 0.204, 0.22, 0.94),
+            "regions.asset_shelf.back": (0.22, 0.204, 0.22, 0.6),
+            "regions.asset_shelf.header_back": (0.22, 0.204, 0.22, 0.0),  # the kit draws the tabs' pane
             # Slider tracks and fields are darker than the panel they sit on.
             "user_interface.wcol_numslider.inner": (0.165, 0.165, 0.18, 1.0),
             "user_interface.wcol_num.inner": (0.165, 0.165, 0.18, 1.0),

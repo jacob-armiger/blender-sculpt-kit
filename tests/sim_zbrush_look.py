@@ -66,7 +66,8 @@ def test(sim):
               len(saved) > 200 and saved.get("system.use_region_overlap") is True, len(saved))
     sim.check("the canvas fades from black to grey", gradients.background_type == 'LINEAR'
               and close(gradients.high_gradient, (0, 0, 0)) and gradients.gradient[0] > 0.25, tuple(gradients.gradient))
-    sim.check("shelves sit beside the canvas", not preferences.system.use_region_overlap)
+    sim.check("shelves float over the canvas, which runs the viewport's full height",
+              preferences.system.use_region_overlap)
 
     # ------------------------------------------------------ shelf and material
     for ob in list(bpy.data.objects):
@@ -299,7 +300,7 @@ def test(sim):
     prefs.look_style = 'ZBRUSH'
     yield 0.8
     sim.check("back to the ZBrush style, which remembers its own material", theme.wearing() == 'ZBRUSH'
-              and matcap() == "sculptkit_grey.exr" and not preferences.system.use_region_overlap,
+              and matcap() == "sculptkit_grey.exr" and preferences.system.use_region_overlap,
               (theme.wearing(), matcap()))
     prefs.look_material_zbrush = 'RED_WAX'
     yield 0.5

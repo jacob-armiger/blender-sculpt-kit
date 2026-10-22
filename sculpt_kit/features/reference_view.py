@@ -164,6 +164,8 @@ def _keep_in_step():
     _match_scale(reference_area, sculpt_area)
     if _adds_to_reference(context.view_layer, context.scene) and not bpy.app.timers.is_registered(_add_to_sculpt):
         bpy.app.timers.register(_add_to_sculpt, first_interval=0.0)  # not while drawing
+    if _bars_differ(reference_area, sculpt_area) and not bpy.app.timers.is_registered(_match_bars):
+        bpy.app.timers.register(_match_bars, first_interval=0.0)
     key = screen.as_pointer()
     view = _view(area.spaces.active)
     if key in _shown and _same(view, _shown[key]):
@@ -173,6 +175,26 @@ def _keep_in_step():
     if not _same(_view(other.spaces.active), view):
         _show(other.spaces.active, view)
         other.tag_redraw()
+
+
+BARS = ("show_region_header", "show_region_tool_header")
+
+
+def _bars_differ(reference_area, sculpt_area):
+    """Whether the reference half shows a different set of bars across its top than the sculpt half: its canvas
+    would then be a different height, and the two pictures would not be level."""
+    reference, sculpt = reference_area.spaces.active, sculpt_area.spaces.active
+    return any(getattr(reference, bar) != getattr(sculpt, bar) for bar in BARS)
+
+
+def _match_bars():
+    """Give the reference half of every open reference view the sculpt half's bars."""
+    for window in bpy.context.window_manager.windows:
+        halves = _halves(window.screen) if window.screen.get(MARK) else None
+        if halves is not None and _bars_differ(*halves):
+            reference, sculpt = (area.spaces.active for area in halves)
+            for bar in BARS:
+                setattr(reference, bar, getattr(sculpt, bar))
 
 
 def _reference_branch(scene):
@@ -250,14 +272,23 @@ def _unblank_bars():
 
 # ------------------------------------------------------------ the same frame
 
-def _clear(area):
-    """The part of a viewport's canvas that no panel lies over, as (left, bottom, right, top) in pixels
-    from the middle of the canvas, which is where both halves show the same point."""
+# Regions that can be seen through when they float over the canvas: what is under them still counts as shown.
+# The brush shelf is see-through too, but the halves are compared at the border along its top, as Jacob asked.
+SEE_THROUGH = {'TOOLS', 'HUD'}
+
+
+def _clear(area, blank=False):
+    """The part of a viewport's canvas that no panel hides, as (left, bottom, right, top) in pixels
+    from the middle of the canvas, which is where both halves show the same point. `blank` is for the reference
+    half, whose bars draw nothing: where they float over the canvas, it shows through them."""
     canvas = common.window_region(area)
     left, bottom, right, top = 0, 0, canvas.width, canvas.height
+    see_through_bars = bpy.context.preferences.themes[0].view_3d.space.header[3] < 1.0  # an empty one hides nothing
     for region in area.regions:
         if region.type == 'WINDOW' or region.width <= 1 or region.height <= 1:  # hidden ones are a pixel wide
             continue
+        if region.type in SEE_THROUGH or (blank and region.type in {'HEADER', 'TOOL_HEADER'} and see_through_bars):
+            continue  # beside the canvas it is not over it; over it, the canvas shows through
         if (region.x >= canvas.x + canvas.width or region.x + region.width <= canvas.x
                 or region.y >= canvas.y + canvas.height or region.y + region.height <= canvas.y):
             continue  # beside the canvas, not over it
@@ -278,7 +309,7 @@ def shared_frame(screen):
     halves = _halves(screen) if screen.get(MARK) else None
     if halves is None:
         return None
-    a, b = _clear(halves[0]), _clear(halves[1])
+    a, b = _clear(halves[0], blank=True), _clear(halves[1])
     return max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
 
 
@@ -289,7 +320,7 @@ def bands(screen, area):
         return []
     canvas = common.window_region(area)
     width, height, x, y = canvas.width, canvas.height, canvas.width / 2, canvas.height / 2
-    own = _clear(area)
+    own = _clear(area, blank=area == _halves(screen)[0])
     x0 = x + frame[0] if frame[0] - own[0] > SLIVER else 0
     x1 = x + frame[2] if own[2] - frame[2] > SLIVER else width
     strips = []

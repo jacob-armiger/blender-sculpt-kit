@@ -1,7 +1,7 @@
 {
  "styles": {
   "ZBRUSH": {
-   "system.use_region_overlap": false,
+   "system.use_region_overlap": true,
    "themes[0].clip_editor.space.back": [
     0.1412,
     0.1412,
@@ -298,13 +298,13 @@
     0.141,
     0.141,
     0.141,
-    1.0
+    0.6
    ],
    "themes[0].regions.asset_shelf.header_back": [
-    0.0853,
-    0.0853,
-    0.0853,
-    1.0
+    0.141,
+    0.141,
+    0.141,
+    0.0
    ],
    "themes[0].regions.channels.back": [
     0.0853,
@@ -326,7 +326,7 @@
     0.141,
     0.141,
     0.141,
-    1.0
+    0.8
    ],
    "themes[0].regions.sidebars.tab_back": [
     0.102,
@@ -1516,13 +1516,13 @@
     0.22,
     0.204,
     0.22,
-    0.94
+    0.6
    ],
    "themes[0].regions.asset_shelf.header_back": [
-    0.1137,
-    0.1137,
-    0.1297,
-    1.0
+    0.22,
+    0.204,
+    0.22,
+    0.0
    ],
    "themes[0].regions.channels.back": [
     0.1137,

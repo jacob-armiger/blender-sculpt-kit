@@ -23,7 +23,7 @@ build = "cp312-*"
 skip = ["*-musllinux_*", "*_i686", "*-win32"]
 build-verbosity = 1
 test-requires = ["numpy"]
-test-command = "python {project}/tests/smoke.py"
+test-command = "python {package}/tests/smoke.py"   # {package} is native/; {project} is the repository root
 
 [tool.cibuildwheel.macos]
 archs = ["arm64"]

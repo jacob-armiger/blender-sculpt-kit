@@ -72,7 +72,10 @@ target_link_libraries(_engine PRIVATE tbb_static)
 # C++17 by libc++ (Apple) and MSVC unless these switches bring it back. GCC's libstdc++ only warns.
 target_compile_definitions(_engine PRIVATE
   _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION _HAS_AUTO_PTR_ETC=1 _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
-if (NOT MSVC)
+if (MSVC)
+  # Instant Meshes uses M_PI, which MSVC's <cmath> only defines on request; NOMINMAX keeps std::min/max usable.
+  target_compile_definitions(_engine PRIVATE _USE_MATH_DEFINES NOMINMAX)
+else()
   target_compile_options(_engine PRIVATE -Wno-deprecated-declarations -Wno-unused-result)
 endif()
 

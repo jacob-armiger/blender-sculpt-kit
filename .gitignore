@@ -8,3 +8,4 @@ dist/
 
 # ZBrush source brushes, other people's alphas and the local Kingslien and Archive libraries: kept locally
 brush_sources/
+.bench-profile/

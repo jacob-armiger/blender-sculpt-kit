@@ -676,6 +676,11 @@ def mirror_and_weld(mesh, axis, merge_distance):
     bm = bmesh.new()
     bm.from_mesh(mesh)
     before = len(bm.verts)
+    # The engine's boundary alignment leaves the cut's vertices near the plane, not on it; put them on it,
+    # so the two halves meet exactly and the weld catches every pair.
+    for v in bm.verts:
+        if v.is_boundary and abs(v.co[axis]) < 2.0 * merge_distance:
+            v.co[axis] = 0.0
     scale = [1.0, 1.0, 1.0]
     scale[axis] = -1.0
     bmesh.ops.mirror(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], matrix=Matrix.Diagonal(scale).to_4x4(),

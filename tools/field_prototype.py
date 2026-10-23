@@ -47,6 +47,7 @@ def parse():
                    help="mirror plane the field is made square to; auto reads the mesh's X symmetry setting")
     p.add_argument("--hard", type=float, default=50.0, help="weight of a pinned vertex, against align times "
                                                               "confidence (at most align) on a free one")
+    p.add_argument("--cg-iterations", type=int, default=400, help="conjugate gradient cap for the aligned solve")
     p.add_argument("--pin-all", action="store_true",
                    help="freeze the engine's orientation field to ours (written in, never optimised) instead of "
                         "handing it over as soft constraints weighted by confidence")
@@ -286,12 +287,12 @@ def smoothest_field(edges, weights, r, mass, rounds=20):
     return z
 
 
-def aligned_field(edges, weights, r, mass, d, weight, start):
+def aligned_field(edges, weights, r, mass, d, weight, start, iterations=400):
     """Minimizes the Dirichlet energy plus sum m_i w_i |z_i - d_i|^2: w is align times the curvature confidence
     on free vertices, and the hard weight on constrained ones (sharp edges, the symmetry plane)."""
     diag = mass * weight
     z, steps = conjugate_gradient(lambda x: laplacian_apply(x, edges, weights, r) + diag * x + 1e-6 * mass * x,
-                                  diag * d, start)
+                                  diag * d, start, iterations=iterations)
     return z, steps
 
 
@@ -499,7 +500,7 @@ def main():
         else:
             weight = align * anisotropy
             weight[pinned] = args.hard
-            z, steps = aligned_field(edges, weights, r, mass, d, weight, z if z is not None else d.copy())
+            z, steps = aligned_field(edges, weights, r, mass, d, weight, z if z is not None else d.copy(), args.cg_iterations)
         index = face_indices(z, tris, edge_of_side, edges, r, r1)
         singular = int((index != 0).sum())
         row = {"align": align, "seconds": round(time.perf_counter() - started, 2), "cg_steps": steps,

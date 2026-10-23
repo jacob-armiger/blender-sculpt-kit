@@ -5,36 +5,74 @@ the model's size, so the same setting gives the same density whether the model
 is a centimetre or ten metres across. Blender's own voxel size is an absolute
 length that has to be re-tuned whenever the scale changes.
 
-Quad Remesh wraps Blender's QuadriFlow remesher, which refuses any mesh with an
+Repairing Remesh wraps Blender's QuadriFlow quad remesher, which refuses any mesh with an
 edge shorter than 0.0001 units and reports it as "needs to be manifold". Fine
 voxel meshes hit that limit in two ways: a handful of near-zero edges that the
-voxel remesher leaves behind, or simply being small and dense. Quad Remesh
+voxel remesher leaves behind, or simply being small and dense. Repairing Remesh
 merges the first kind, scales the mesh up for the duration to avoid the
 second, repairs real non-manifold edges, and scales back afterwards.
+
+On a sculpt QuadriFlow also takes its edge directions from brush-level noise,
+which is what blows the result out at large reductions. So it is given a copy
+smoothed to the size of the quads it is asked for, the way Maxon advises for
+ZRemesher, and the quads it makes are then snapped back onto the original sculpt
+and relaxed, which brings back the detail they can hold. A result with holes is
+retried once with another seed. The seed is in the operator's corner panel: a
+new one is a fresh try from the original sculpt.
 """
 import bmesh
 import bpy
 import numpy as np
-from bpy.props import BoolProperty, IntProperty
+from bpy.props import BoolProperty, FloatProperty, IntProperty
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 from .. import common
 
 QUADRIFLOW_EDGE_LIMIT = 1e-4  # object.quadriflow_remesh rejects meshes with an edge shorter than this
 SAFE_EDGE = 1e-3              # what the shortest edge is scaled up to before calling it
+MAX_SMOOTHING = 40            # Taubin passes at most: about 4 s on a million faces
 
 _added = []  # (keymap, keymap item) pairs this feature created
 
 
+# Reading a mesh through its attributes is 20 to 60 times faster than through vertices, edges and loops.
+
 def _coordinates(mesh):
     co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
-    mesh.vertices.foreach_get("co", co)
+    mesh.attributes["position"].data.foreach_get("vector", co)
     return co.reshape(-1, 3)
+
+
+def _set_coordinates(mesh, co):
+    mesh.attributes["position"].data.foreach_set("vector", np.ascontiguousarray(co, dtype=np.float32).ravel())
+    mesh.update()
+
+
+def _edges(mesh):
+    verts = np.empty(len(mesh.edges) * 2, dtype=np.int32)
+    mesh.attributes[".edge_verts"].data.foreach_get("value", verts)
+    return verts.reshape(-1, 2)
+
+
+def _corners(mesh, name):
+    values = np.empty(len(mesh.loops), dtype=np.int32)
+    mesh.attributes[name].data.foreach_get("value", values)
+    return values
 
 
 def _scale_mesh(mesh, factor):
     if factor != 1.0:
-        mesh.vertices.foreach_set("co", (_coordinates(mesh) * factor).ravel())
-        mesh.update()
+        _set_coordinates(mesh, _coordinates(mesh) * factor)
+
+
+def _neighbour_mean(co, edges, count):
+    """Each vertex's average neighbour position."""
+    total = np.empty_like(co)
+    for axis in range(3):
+        total[:, axis] = (np.bincount(edges[:, 0], weights=co[edges[:, 1], axis], minlength=len(co))
+                          + np.bincount(edges[:, 1], weights=co[edges[:, 0], axis], minlength=len(co)))
+    return total / np.maximum(count, 1)[:, None]
 
 
 def _has_multires(ob):
@@ -119,13 +157,9 @@ def estimate_faces(mesh, resolution):
 def _inspect(mesh):
     """Per edge: its length, how many faces use it, and whether those faces disagree about which way is out."""
     co = _coordinates(mesh).astype(np.float64)
-    edge_verts = np.empty(len(mesh.edges) * 2, dtype=np.int32)
-    mesh.edges.foreach_get("vertices", edge_verts)
-    edge_verts = edge_verts.reshape(-1, 2)
-    corner_edges = np.empty(len(mesh.loops), dtype=np.int32)
-    corner_verts = np.empty(len(mesh.loops), dtype=np.int32)
-    mesh.loops.foreach_get("edge_index", corner_edges)
-    mesh.loops.foreach_get("vertex_index", corner_verts)
+    edge_verts = _edges(mesh)
+    corner_edges = _corners(mesh, ".corner_edge")
+    corner_verts = _corners(mesh, ".corner_vert")
 
     lengths = np.linalg.norm(co[edge_verts[:, 0]] - co[edge_verts[:, 1]], axis=1)
     uses = np.bincount(corner_edges, minlength=len(mesh.edges))
@@ -188,17 +222,141 @@ def prepare_for_quadriflow(mesh):
     return scale, repairs
 
 
+def _smooth_for_field(mesh, target_faces, strength):
+    """Smooth away detail finer than the quads to come, so QuadriFlow sets its directions from the forms.
+
+    Taubin smoothing (a shrinking step, then an inflating one) keeps thin parts such as fingers from shrinking.
+    How far it reaches grows with the target quad size: a diffusion spreads about one edge per square root
+    of its steps, so the steps are the square of how many input edges fit across one target quad."""
+    if strength <= 0.0 or not len(mesh.polygons):
+        return
+    co = _coordinates(mesh).astype(np.float64)
+    edges = _edges(mesh)
+    count = np.bincount(edges.ravel(), minlength=len(co))
+    edge = float(np.median(np.linalg.norm(co[edges[:, 0]] - co[edges[:, 1]], axis=1)))
+    area = np.empty(len(mesh.polygons), dtype=np.float32)
+    mesh.polygons.foreach_get("area", area)
+    quad = (float(area.sum()) / max(target_faces, 1)) ** 0.5
+    steps = int(min(MAX_SMOOTHING, strength * (quad / max(edge, 1e-12)) ** 2))
+    for _ in range(steps):
+        co += 0.5 * (_neighbour_mean(co, edges, count) - co)
+        co -= 0.53 * (_neighbour_mean(co, edges, count) - co)
+    _set_coordinates(mesh, co)
+
+
+def _project_and_relax(mesh, surface, rounds=2):
+    """Snap the new quads onto the original sculpt, evening them out along the surface between snaps."""
+    co = _coordinates(mesh).astype(np.float64)
+    edges = _edges(mesh)
+    count = np.bincount(edges.ravel(), minlength=len(co))
+
+    def snap(points):
+        out = np.empty_like(points)
+        normals = np.empty_like(points)
+        for i, point in enumerate(points):
+            hit, normal, _index, _distance = surface.find_nearest(Vector(point))
+            out[i] = hit if hit is not None else point
+            normals[i] = normal if normal is not None else (0.0, 0.0, 1.0)
+        return out, normals
+
+    co, normals = snap(co)
+    for _ in range(rounds):
+        move = _neighbour_mean(co, edges, count) - co
+        move -= (move * normals).sum(axis=1)[:, None] * normals  # only along the surface
+        co, normals = snap(co + 0.5 * move)
+    _set_coordinates(mesh, co)
+
+
+def _unfold(mesh, surface, rounds=20):
+    """Find the faces where QuadriFlow's grid did not close (folded, tilted far from the sculpt, squashed to
+    nothing, or drawn out into needles that radiate from one point, all showing as small pinches) and relax
+    the vertices around them along the surface, snapping back onto the sculpt each round, until the quads
+    there even out. Returns how many faces were found."""
+    count_faces = len(mesh.polygons)
+    if not count_faces:
+        return 0
+    co = _coordinates(mesh).astype(np.float64)
+    corners = _corners(mesh, ".corner_vert")
+    starts = np.empty(count_faces, dtype=np.int32)
+    sizes = np.empty(count_faces, dtype=np.int32)
+    mesh.polygons.foreach_get("loop_start", starts)
+    mesh.polygons.foreach_get("loop_total", sizes)
+    normals = np.empty(count_faces * 3, dtype=np.float32)
+    centres = np.empty(count_faces * 3, dtype=np.float32)
+    areas = np.empty(count_faces, dtype=np.float32)
+    mesh.polygons.foreach_get("normal", normals)
+    mesh.polygons.foreach_get("center", centres)
+    mesh.polygons.foreach_get("area", areas)
+    normals, centres = normals.reshape(-1, 3), centres.reshape(-1, 3)
+
+    bad = areas < 0.1 * float(np.median(areas))  # squashed to nothing
+    quads = np.flatnonzero(sizes == 4)
+    if len(quads):  # needles: the longest side four times the shortest
+        ring = corners[starts[quads][:, None] + np.arange(4)]
+        sides = np.linalg.norm(co[ring] - co[np.roll(ring, -1, axis=1)], axis=2)
+        bad[quads] |= sides.max(axis=1) > 4.0 * np.maximum(sides.min(axis=1), 1e-12)
+    for i, centre in enumerate(centres):  # folded over, or tilted more than 60 degrees from the sculpt
+        _hit, normal, _index, _distance = surface.find_nearest(Vector(centre))
+        if normal is not None and normals[i] @ np.asarray(normal) <= 0.5:
+            bad[i] = True
+    found = np.flatnonzero(bad)
+    if not len(found):
+        return 0
+
+    picked = np.zeros(len(co), dtype=bool)
+    for face in found:
+        picked[corners[starts[face]:starts[face] + sizes[face]]] = True
+    edges = _edges(mesh)
+    for _ in range(3):  # three rings of neighbours, so the fix blends into the surface around it
+        grown = picked.copy()
+        grown[edges[picked[edges[:, 0]], 1]] = True
+        grown[edges[picked[edges[:, 1]], 0]] = True
+        picked = grown
+    moving = np.flatnonzero(picked)
+    count = np.bincount(edges.ravel(), minlength=len(co))
+    for _ in range(rounds):
+        target = co[moving] + 0.5 * (_neighbour_mean(co, edges, count)[moving] - co[moving])
+        for k, point in zip(moving, target):
+            hit, _normal, _index, _distance = surface.find_nearest(Vector(point))
+            co[k] = hit if hit is not None else point
+    _set_coordinates(mesh, co)
+    return len(found)
+
+
+def _pinch_points(mesh):
+    """Vertices where six or more edges meet: where QuadriFlow's grid could not close, which another seed
+    usually moves away."""
+    if not len(mesh.edges):
+        return 0
+    edges = _edges(mesh)
+    return int((np.bincount(edges.ravel(), minlength=len(mesh.vertices)) >= 6).sum())
+
+
+def _open_edges(mesh):
+    if not len(mesh.edges):
+        return 0
+    uses = np.bincount(_corners(mesh, ".corner_edge"), minlength=len(mesh.edges))
+    return int((uses == 1).sum())
+
+
 class SCULPTKIT_OT_quad_remesh(bpy.types.Operator):
-    """Rebuild the mesh as clean quads. Repairs what Blender's quad remesher would refuse, then runs it"""
+    """Rebuild the mesh as clean quads. Repairs what Blender's quad remesher would refuse, remeshes a smoothed
+copy so the result follows the forms, then snaps it back onto the sculpt"""
     bl_idname = "sculptkit.quad_remesh"
-    bl_label = "Quad Remesh"
+    bl_label = "Repairing Remesh"
     bl_options = {'REGISTER', 'UNDO'}
 
     target_faces: IntProperty(name="Faces", default=0, min=0, soft_max=500_000,
                               description="Roughly how many faces to aim for. 0 uses the value in the Sculpt Kit panel")
+    seed: IntProperty(name="Seed", default=0, min=0,
+                      description="Change it for a different layout: each value is a fresh try from the original sculpt")
+    smoothing: FloatProperty(name="Smoothing", default=1.0, min=0.0, soft_max=2.0,
+                             description="How much finer-than-quad detail is smoothed away before the layout is "
+                                         "worked out. The detail comes back when the quads are snapped onto the sculpt")
     use_symmetry: BoolProperty(name="Use Mesh Symmetry", default=True,
                                description="Build a symmetrical result using the mesh's symmetry settings")
-    preserve_sharp: BoolProperty(name="Preserve Sharp Edges", default=False)
+    preserve_sharp: BoolProperty(name="Preserve Sharp Edges", default=False, options={'SKIP_SAVE'},
+                                 description="Keep sharp creases. Left unset, the Sculpt Kit panel's checkbox decides")
     smooth_normals: BoolProperty(name="Smooth Normals", default=True)
 
     @classmethod
@@ -207,22 +365,58 @@ class SCULPTKIT_OT_quad_remesh(bpy.types.Operator):
 
     def execute(self, context):
         ob = context.active_object
-        target = self.target_faces or context.scene.sculpt_kit_quad_faces
+        # Values left unset come from the Sculpt Kit panel. They are written back, so that the corner panel
+        # shows what was used, and a change there (a new Seed) reruns with the same settings.
+        if not self.target_faces:
+            self.target_faces = context.scene.sculpt_kit_quad_faces
+        if not self.properties.is_property_set("preserve_sharp"):
+            self.preserve_sharp = context.scene.sculpt_kit_quad_sharp
+        target, sharp = self.target_faces, self.preserve_sharp
         with common.object_mode(context):
-            scale, repairs = prepare_for_quadriflow(ob.data)
-            try:
-                result = bpy.ops.object.quadriflow_remesh(
-                    mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
-                    use_preserve_sharp=self.preserve_sharp, smooth_normals=self.smooth_normals)
-            finally:
-                _scale_mesh(ob.data, 1.0 / scale)
+            original = ob.data
+            surface = BVHTree.FromObject(ob, context.evaluated_depsgraph_get())  # the sculpt, to snap back onto
+            closed = _open_edges(original) == 0
+            result, repairs, holes, unfolded, pinches = {'CANCELLED'}, {}, False, 0, 0
+            for attempt in range(2):  # a result with holes gets one more try with another seed
+                work = original.copy()
+                ob.data = work
+                _smooth_for_field(work, target, self.smoothing * (1.5 if attempt else 1.0))
+                scale, repairs = prepare_for_quadriflow(work)
+                try:
+                    result = bpy.ops.object.quadriflow_remesh(
+                        mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
+                        use_preserve_sharp=sharp, smooth_normals=self.smooth_normals,
+                        preserve_attributes=True, seed=self.seed + attempt)
+                except RuntimeError:  # QuadriFlow reports a refusal as an error, not as a cancelled result
+                    result = {'CANCELLED'}
+                finally:
+                    _scale_mesh(work, 1.0 / scale)
+                holes = 'FINISHED' in result and closed and _open_edges(work) > 0
+                if 'FINISHED' in result and (not holes or attempt == 1):
+                    break
+                ob.data = original
+                bpy.data.meshes.remove(work)
+                work = None
+            if work is not None:
+                _project_and_relax(work, surface)
+                unfolded = _unfold(work, surface)
+                pinches = _pinch_points(work)
+                name = original.name
+                if original.users == 0:
+                    bpy.data.meshes.remove(original)
+                work.name = name
 
         repaired = ", ".join("%d %s" % (count, what) for what, count in repairs.items())
-        if 'FINISHED' not in result:
-            self.report({'ERROR'}, "Quad remesh failed" + (" even after repairs (%s)" % repaired if repaired else ""))
+        if work is None:
+            self.report({'ERROR'}, "Quad remesh failed" + (" even after repairs (%s)" % repaired if repaired else "")
+                        + ". Try another Seed in the corner panel, or more Smoothing")
             return {'CANCELLED'}
-        self.report({'INFO'}, "Quad remeshed to {:,} faces".format(len(ob.data.polygons))
-                    + (". Repaired first: " + repaired if repaired else ""))
+        self.report({'WARNING'} if holes or pinches else {'INFO'}, "Quad remeshed to {:,} faces".format(len(work.polygons))
+                    + (". Repaired first: " + repaired if repaired else "")
+                    + (". Evened out %d pinched faces" % unfolded if unfolded else "")
+                    + (". It has holes" if holes else "")
+                    + (". %d pinch point%s" % (pinches, "s" if pinches > 1 else "") if pinches else "")
+                    + (": try another Seed in the corner panel" if holes or pinches else ""))
         return {'FINISHED'}
 
 
@@ -261,8 +455,11 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
         col.separator()
         row = col.row(align=True).split(factor=0.68, align=True)
         row.enabled = not blocked
-        row.prop(scene, "sculpt_kit_quad_faces", text="Quad", slider=True)  # a drag across covers the usual range
+        row.prop(scene, "sculpt_kit_quad_faces", text="Repairing", slider=True)  # a drag across covers the usual range
         row.operator(SCULPTKIT_OT_quad_remesh.bl_idname, text="Remesh")
+        sub = col.row()
+        sub.enabled = not blocked
+        sub.prop(scene, "sculpt_kit_quad_sharp")
         if not blocked:
             common.info(col, "%s \u2192 about %s faces" % (common.face_count(now),
                                                             common.face_count(scene.sculpt_kit_quad_faces)))
@@ -276,9 +473,13 @@ def enable():
         name="Resolution", default=128, min=8, soft_max=1024, max=4096,
         description="How many voxels fit across the model's longest side. Higher keeps finer detail; doubling it "
                     "gives about four times the faces. The same value gives the same density on a model of any size")
+    bpy.types.Scene.sculpt_kit_quad_sharp = BoolProperty(
+        name="Preserve Sharp Edges", default=True,
+        description="Keep sharp creases in a Repairing Remesh. On dense sculpts it also keeps the result from "
+                    "distorting where the surface turns sharply")
     bpy.types.Scene.sculpt_kit_quad_faces = IntProperty(
         name="Quad Faces", default=5000, min=100, soft_max=100_000, max=2_000_000,
-        description="Roughly how many faces Quad Remesh aims for. Drag across for up to 100 thousand, "
+        description="Roughly how many faces Repairing Remesh aims for. Drag across for up to 100 thousand, "
                     "Shift + drag for finer steps, or type a number for more")
     for cls in _classes:
         bpy.utils.register_class(cls)
@@ -295,3 +496,4 @@ def disable():
     _measured.clear()
     del bpy.types.Scene.sculpt_kit_remesh_resolution
     del bpy.types.Scene.sculpt_kit_quad_faces
+    del bpy.types.Scene.sculpt_kit_quad_sharp

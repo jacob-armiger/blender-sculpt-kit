@@ -27,7 +27,8 @@ FEATURES = (
             "Sidebar buttons that add a sphere, rounded cube or thin armature cylinder of about 25 thousand quads or triangles",
             sculpt_session.enable, sculpt_session.disable),
     Feature("remesh", "Remesh tools",
-            "Voxel Remesh by resolution on Ctrl + R, like DynaMesh, and a Quad Remesh that repairs the mesh first",
+            "Voxel Remesh (Ctrl + R) evens out a sculpt's mesh at the same detail whatever its size, like DynaMesh. "
+            "Repairing Remesh turns a dense sculpt into clean quads while keeping its shape",
             remesh.enable, remesh.disable),
     Feature("subdivide", "Subdivide",
             "Sidebar panel for subdivision levels like ZBrush's: Divide, Lower / Higher, SDiv, and a plain Subdivide Mesh",

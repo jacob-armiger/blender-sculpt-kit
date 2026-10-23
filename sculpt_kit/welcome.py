@@ -54,7 +54,7 @@ class SCULPTKIT_OT_welcome(bpy.types.Operator):
     subtools: BoolProperty(name="Subtools", default=True, description="A list of the scene's meshes to switch between")
     subdivide: BoolProperty(name="Subdivide", default=True, description="Quick access to Multires and subdivision")
     remesh: BoolProperty(name="Remesh", default=True,
-                         description="Voxel remeshing by resolution, and quad remeshing that repairs the mesh first")
+                         description="Voxel remeshing by resolution, and Repairing Remesh: quad remeshing built for dense sculpts")
     reference: BoolProperty(name="Reference View", default=True,
                             description="Compare the sculpt side by side with a reference, at the same view and scale")
     interface: BoolProperty(name="ZBrush-style layout, brush bar and materials", default=True,

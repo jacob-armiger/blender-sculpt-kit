@@ -22,7 +22,7 @@ Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt K
 - **Spawn Sculpt-ready forms:** Sphere, cube, or cylinder made of quads
 - **Subtools:** switch between, hide and organize the meshes in your scene
 - **Subdivide:** quick access to Multires and subdivision while you sculpt
-- **Remesh:** DynaMesh-style voxel remeshing by resolution, and self-repairing quad remeshing
+- **Remesh:** DynaMesh-style voxel remeshing by resolution, and **Repairing Remesh**, a quad remesh built for sculpts.
 
 ### Brushes
 

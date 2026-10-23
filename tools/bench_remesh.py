@@ -39,7 +39,7 @@ def parse():
 def noisy_sphere(faces):
     """An icosphere of about this many faces, with brush-grain noise of 0.4 edge lengths."""
     import bmesh
-    subdivisions = int(round(np.log(faces / 20) / np.log(4)))
+    subdivisions = int(np.ceil(np.log(faces / 20) / np.log(4) - 0.01))  # at least this many faces
     bm = bmesh.new()
     bmesh.ops.create_icosphere(bm, subdivisions=subdivisions, radius=1.0)
     mesh = bpy.data.meshes.new("noisy sphere")

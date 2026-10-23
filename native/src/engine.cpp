@@ -128,7 +128,10 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
         mRes.propagateSolution(rosy);
         mRes.setFrozenQ(true);
     }
-    bool constrained = !frozen && (orientation != nullptr || align_to_boundaries);
+    /* Boundary alignment still applies with a frozen field: its position constraints pin the lattice to the
+       boundary so quads end on it square-on (what a mirrored half needs at the seam); only its orientation
+       part is left out, since the frozen field already says which way to go there. */
+    bool constrained = (!frozen && orientation != nullptr) || align_to_boundaries;
     if (constrained)
         mRes.clearConstraints();
     if (orientation != nullptr && !frozen) {
@@ -156,8 +159,11 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
                     edge.normalize();
                     mRes.CO().col(i0) = p0;
                     mRes.CO().col(i1) = p1;
-                    mRes.CQ().col(i0) = mRes.CQ().col(i1) = edge;
-                    mRes.CQw()[i0] = mRes.CQw()[i1] = mRes.COw()[i0] = mRes.COw()[i1] = 1.0f;
+                    mRes.COw()[i0] = mRes.COw()[i1] = 1.0f;
+                    if (!frozen) {
+                        mRes.CQ().col(i0) = mRes.CQ().col(i1) = edge;
+                        mRes.CQw()[i0] = mRes.CQw()[i1] = 1.0f;
+                    }
                 }
             }
         }

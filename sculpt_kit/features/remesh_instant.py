@@ -106,7 +106,8 @@ def _fill_holes(mesh):
 
 
 def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=True, smooth_iterations=2,
-           fill_holes=True, orientation=None, orientation_weight=None, freeze_orientation=False):
+           fill_holes=True, orientation=None, orientation_weight=None, freeze_orientation=False,
+           align_to_boundaries=False):
     """Rebuild the mesh with Instant Meshes. Returns timings and counts; raises RuntimeError when it fails.
     fill_holes closes the gaps it leaves: pass False for a mesh that is meant to have open edges.
     orientation (one direction per vertex) and orientation_weight (0 to 1 each) steer the layout; they need
@@ -128,6 +129,8 @@ def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=
                 steering["orientation_weight"] = np.ascontiguousarray(orientation_weight, dtype=np.float32)
             if freeze_orientation:  # wheels built before the freeze hook do not know the argument
                 steering["freeze_orientation"] = True
+        if align_to_boundaries:  # quads end square-on at open edges (a half to be mirrored)
+            steering["align_to_boundaries"] = True
         out = sculpt_kit_remesh.remesh(
             co.reshape(-1, 3), tris, target_faces=target_faces, pure_quad=pure_quad, crease_angle=crease_angle,
             deterministic=deterministic, smooth_iterations=smooth_iterations, **steering)

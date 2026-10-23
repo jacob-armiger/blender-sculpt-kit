@@ -57,6 +57,9 @@ def parse():
                         "quads and build the smoothest field with exactly those (a trivial connection); 0 disables")
     p.add_argument("--trivial-align", type=float, default=0.0,
                    help="re-align that field to curvature with this weight on the adjusted connection")
+    p.add_argument("--halve", action="store_true",
+                   help="cut the proxy at the symmetry plane, solve and remesh one half with the quads ending "
+                        "square-on at the cut, mirror and weld (needs --symmetry or the mesh's X symmetry on)")
     p.add_argument("--pin-all", action="store_true",
                    help="freeze the engine's orientation field to ours (written in, never optimised) instead of "
                         "handing it over as soft constraints weighted by confidence")
@@ -642,8 +645,52 @@ def quad_axis_alignment(mesh, remesh):
     return float(np.cos(4 * angle)[band].mean()) if band.any() else None
 
 
+def halve(ob, axis):
+    """Keep the positive side of the object's mirror plane (bisect, no fill): the half the field and the
+    remesh are done on. The cut leaves open edges along the plane."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    normal = [0.0, 0.0, 0.0]
+    normal[axis] = 1.0
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], dist=1e-6,
+                           plane_co=(0.0, 0.0, 0.0), plane_no=normal, clear_inner=True, clear_outer=False)
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+
+
+def mirror_and_weld(mesh, axis, merge_distance):
+    """The other half as the mirror image, welded along the plane. Returns how many vertices were merged."""
+    import bmesh
+    from mathutils import Matrix
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    before = len(bm.verts)
+    scale = [1.0, 1.0, 1.0]
+    scale[axis] = -1.0
+    bmesh.ops.mirror(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], matrix=Matrix.Diagonal(scale).to_4x4(),
+                     merge_dist=merge_distance, axis="XYZ"[axis])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    merged = 2 * before - len(bm.verts)
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.update()
+    return merged
+
+
+def seam_report(mesh, remesh, axis, width):
+    """Vertices within `width` of the plane: how many, and how many are not valence 4 (a clean seam is a
+    plain edge loop, every vertex on it valence 4)."""
+    co = coordinates(mesh)
+    on_seam = np.abs(co[:, axis]) < width
+    edges = remesh._edges(mesh)
+    valence = np.bincount(edges.ravel(), minlength=len(co))
+    return {"seam_vertices": int(on_seam.sum()), "seam_not_valence_4": int((valence[on_seam] != 4).sum())}
+
+
 def run_engine(name, proxy, source, target, remesh, instant, directions=None, confidence=None, is_capsule=False,
-               freeze=False, positions=None):
+               freeze=False, positions=None, mirror_axis=None, quad=0.0):
     """The kit's engine on a copy of the proxy (at the smoothed positions the field was computed on, when
     given, so the engine's tangent planes are the field's), steered by the field when given, projected onto
     the source."""
@@ -654,8 +701,13 @@ def run_engine(name, proxy, source, target, remesh, instant, directions=None, co
     if positions is not None:
         mesh.attributes["position"].data.foreach_set("vector", np.ascontiguousarray(positions, dtype=np.float32).ravel())
         mesh.update()
-    stats = instant.remesh(mesh, target, pure_quad=True, orientation=directions, orientation_weight=confidence,
-                           freeze_orientation=freeze)
+    stats = instant.remesh(mesh, target // 2 if mirror_axis is not None else target, pure_quad=True,
+                           orientation=directions, orientation_weight=confidence, freeze_orientation=freeze,
+                           align_to_boundaries=mirror_axis is not None, fill_holes=mirror_axis is None)
+    seam = {}
+    if mirror_axis is not None:
+        seam["merged_at_seam"] = mirror_and_weld(mesh, mirror_axis, 0.3 * quad)
+        seam.update(seam_report(mesh, remesh, mirror_axis, 0.3 * quad))
     surface = BVHTree.FromObject(source, bpy.context.evaluated_depsgraph_get())
     remesh._project_and_relax(mesh, surface)
     unfolded = remesh._unfold(mesh, surface)
@@ -663,7 +715,7 @@ def run_engine(name, proxy, source, target, remesh, instant, directions=None, co
     bpy.context.scene.collection.objects.link(ob)
     row = {"seconds": round(time.perf_counter() - started, 2), "faces": len(mesh.polygons),
            "singularities": stats.get("singularities"), "pinch_points": remesh._pinch_points(mesh),
-           "unfolded": unfolded, "open_edges": remesh._open_edges(mesh)}
+           "unfolded": unfolded, "open_edges": remesh._open_edges(mesh), **seam}
     if is_capsule:
         row["quad_axis_alignment"] = quad_axis_alignment(mesh, remesh)
     return row
@@ -694,6 +746,13 @@ def main():
 
     started = time.perf_counter()
     proxy = proxy_of(source, args.proxy, args.proxy_method)
+    mirror_axis = None
+    if args.halve:
+        axis_name = args.symmetry if args.symmetry not in ("auto", "none") else ("x" if source.data.use_mirror_x else "none")
+        if axis_name != "none":
+            mirror_axis = "xyz".index(axis_name)
+            halve(proxy, mirror_axis)
+            print("FIELD halved the proxy at the %s plane: %d faces" % (axis_name, len(proxy.data.polygons)), flush=True)
     co, tris = coordinates(proxy.data), triangles(proxy.data)
     edges, edge_of_side = unique_edges(tris)
     normals, mass, area = vertex_normals_and_areas(co, tris)
@@ -737,7 +796,7 @@ def main():
         else:
             is_capsule = args.shape == "capsule" and not bpy.data.filepath
             row = run_engine("engine free", proxy, source, args.target, remesh_module, instant_module, is_capsule=is_capsule,
-                             positions=smooth)
+                             positions=smooth, mirror_axis=mirror_axis, quad=quad)
             print("FIELD engine free " + json.dumps(row), flush=True)
             results.append({"engine": "free", **row})
     for align in (float(a) for a in args.align.split(",")):
@@ -819,7 +878,7 @@ def main():
             steered = run_engine("engine align %g" % align, proxy, source, args.target, remesh_module, instant_module,
                                  directions.astype(np.float32),
                                  np.ones(len(co), dtype=np.float32) if args.pin_all else anisotropy.astype(np.float32),
-                                 freeze=args.pin_all, positions=smooth,
+                                 freeze=args.pin_all, positions=smooth, mirror_axis=mirror_axis, quad=quad,
                                  is_capsule=args.shape == "capsule" and not bpy.data.filepath)
             print("FIELD engine align %g " % align + json.dumps(steered), flush=True)
             results.append({"engine": "align %g" % align, **steered})

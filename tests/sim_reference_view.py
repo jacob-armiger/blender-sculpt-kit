@@ -108,8 +108,42 @@ def test(sim):
               (right.as_pointer() == original, panels, panels_before))
     sim.check("the reference half is bare", not sim.space(left).overlay.show_overlays and not sim.space(left).show_region_ui
               and not sim.space(left).show_region_toolbar)
+    toolbar_visible = any(region.type == 'TOOLS' and region.width > 1 and region.height > 1
+                          for region in right.regions)
+    reference_bands = module.bands(sim.window.screen, left)
+    sim.check("matching edges leaves a blank strip beside the reference when the sculpt toolbar is visible",
+              not toolbar_visible or any(x0 == 0 and x1 > 0 for x0, _y0, x1, _y1 in reference_bands),
+              reference_bands)
     sim.check("the picture did not jump when the view opened", close(sim.rv3d(right).view_matrix, view_before)
               and together(left, right))
+    from bl_ext.user_default.sculpt_kit.features.zbrush_look import material
+    available = {light.name for light in bpy.context.preferences.studio_lights if light.type == 'MATCAP'}
+    choices = [name for name in material.MATCAPS.values() if name in available]
+    if len(choices) >= 2:
+        left_shading, right_shading = sim.space(left).shading, sim.space(right).shading
+        old_lighting = ((left_shading.light, left_shading.studio_light),
+                        (right_shading.light, right_shading.studio_light))
+        first, second = choices[:2]
+        left_shading.light = right_shading.light = 'MATCAP'
+        left_shading.studio_light = right_shading.studio_light = first
+        module._matcaps[sim.window.screen.as_pointer()] = first
+        right_shading.studio_light = second
+        with sim.override(left):
+            module._keep_in_step()
+        sim.check("choosing a matcap in the sculpt half syncs it to the reference half",
+                  left_shading.studio_light == second and right_shading.studio_light == second,
+                  (left_shading.studio_light, right_shading.studio_light))
+        left_shading.studio_light = first
+        with sim.override(right):
+            module._keep_in_step()
+        sim.check("choosing a matcap in the reference half syncs it to the sculpt half",
+                  left_shading.studio_light == first and right_shading.studio_light == first,
+                  (left_shading.studio_light, right_shading.studio_light))
+        left_shading.light, left_shading.studio_light = old_lighting[0]
+        right_shading.light, right_shading.studio_light = old_lighting[1]
+        module._matcaps[sim.window.screen.as_pointer()] = (
+            old_lighting[1][1] if old_lighting[0][0] == old_lighting[1][0] == 'MATCAP'
+            and old_lighting[0][1] == old_lighting[1][1] else None)
     sim.check("no helper objects were added", not [ob for ob in bpy.data.objects if ob.type == 'CAMERA'],
               [ob.name for ob in bpy.data.objects])
     sim.screenshot("reference_view_open.png")

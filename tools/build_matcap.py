@@ -21,10 +21,10 @@ SIZE = 256
 
 # Brightness on screen, 0 to 1, of a surface facing (x right, y up, z towards the viewer):
 #     AMBIENT + TILT * y + CURVE * y * y + LIGHT * max(0, facing the light) ** FOCUS
-AMBIENT = 0.408      # the grey of a surface turned side-on
-TILT = 0.114         # how much lighter the top is than the underside
-CURVE = -0.031
-LIGHT = 0.282        # what the light adds where the surface faces it
+AMBIENT = 0.36       # the grey of a surface turned side-on
+TILT = 0.15          # how much lighter the top is than the underside
+CURVE = -0.035
+LIGHT = 0.33         # what the light adds where the surface faces it
 FOCUS = 5.0          # higher gathers the light into a smaller, sharper patch
 LIGHT_ABOVE = 13.0   # degrees the light sits above the line of sight
 

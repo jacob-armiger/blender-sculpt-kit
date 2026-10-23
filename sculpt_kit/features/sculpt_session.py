@@ -136,14 +136,12 @@ def _triangulate(mesh):
 
 
 def setup_view(space):
-    """Solid matcap shading with cavity, and none of the scene clutter that gets in the way of a sculpt."""
+    """Solid matcap shading, and none of the scene clutter that gets in the way of a sculpt."""
     from .zbrush_look import material
     shading, overlay = space.shading, space.overlay
     shading.type = 'SOLID'
     shading.light = 'MATCAP'
     material.apply(shading)  # the ZBrush look's material, when that is switched on
-    shading.show_cavity = True
-    shading.cavity_type = 'BOTH'
     overlay.show_floor = False
     overlay.show_axis_x = False
     overlay.show_axis_y = False

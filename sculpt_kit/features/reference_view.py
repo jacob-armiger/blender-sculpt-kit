@@ -53,6 +53,7 @@ EDGE = (1.0, 1.0, 1.0, 0.35)    # the line where that begins
 _halves_of = {}  # screen pointer -> (reference area pointer, sculpt area pointer)
 _blanked = []    # (class, attribute, what the class itself had there or None) while the reference's bars are blank
 _shown = {}      # screen pointer -> the view both halves were last brought to
+_matcaps = {}    # screen pointer -> the shared matcap name
 _handle = None
 _frame_handle = None
 
@@ -86,6 +87,7 @@ def _forget(screen):
         del screen[MARK]
     _halves_of.pop(screen.as_pointer(), None)
     _shown.pop(screen.as_pointer(), None)
+    _matcaps.pop(screen.as_pointer(), None)
 
 
 # -------------------------------------------------------- keeping them in step
@@ -167,6 +169,25 @@ def _keep_in_step():
     if _bars_differ(reference_area, sculpt_area) and not bpy.app.timers.is_registered(_match_bars):
         bpy.app.timers.register(_match_bars, first_interval=0.0)
     key = screen.as_pointer()
+    reference_shading = reference_area.spaces.active.shading
+    sculpt_shading = sculpt_area.spaces.active.shading
+    reference_matcap = reference_shading.studio_light if reference_shading.light == 'MATCAP' else None
+    sculpt_matcap = sculpt_shading.studio_light if sculpt_shading.light == 'MATCAP' else None
+    if reference_matcap is not None and sculpt_matcap is not None:
+        if key not in _matcaps or _matcaps[key] is None:
+            changed = area.spaces.active.shading.studio_light
+            _matcaps[key] = changed
+        else:
+            previous = _matcaps[key]
+            changed = (reference_matcap if reference_matcap != previous else
+                       sculpt_matcap if sculpt_matcap != previous else previous)
+            _matcaps[key] = changed
+        for viewport, shading in ((reference_area, reference_shading), (sculpt_area, sculpt_shading)):
+            if shading.studio_light != changed:
+                shading.studio_light = changed
+                viewport.tag_redraw()
+    else:
+        _matcaps[key] = None
     view = _view(area.spaces.active)
     if key in _shown and _same(view, _shown[key]):
         return
@@ -274,7 +295,8 @@ def _unblank_bars():
 
 # Regions that can be seen through when they float over the canvas: what is under them still counts as shown.
 # The brush shelf is see-through too, but the halves are compared at the border along its top, as Jacob asked.
-SEE_THROUGH = {'TOOLS', 'HUD'}
+# The toolbar is not see-through: its left edge must be matched on the reference side.
+SEE_THROUGH = {'HUD'}
 
 
 def _clear(area, blank=False):
@@ -474,6 +496,8 @@ def _open(context, report):
     screen[MARK] = True
     _halves_of[screen.as_pointer()] = (reference_area.as_pointer(), sculpt_area.as_pointer())
     _shown[screen.as_pointer()] = _view(sculpt_area.spaces.active)
+    shading = sculpt_area.spaces.active.shading
+    _matcaps[screen.as_pointer()] = shading.studio_light if shading.light == 'MATCAP' else None
     return {'FINISHED'}
 
 

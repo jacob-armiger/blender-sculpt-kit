@@ -57,6 +57,10 @@ def parse():
                         "quads and build the smoothest field with exactly those (a trivial connection); 0 disables")
     p.add_argument("--trivial-align", type=float, default=0.0,
                    help="re-align that field to curvature with this weight on the adjusted connection")
+    p.add_argument("--adaptive", type=float, default=0.0,
+                   help="sizing field power: quads shrink where curvature is high as (median / curvature) ** this; "
+                        "0 keeps one size everywhere")
+    p.add_argument("--adaptive-span", type=float, default=4.0, help="largest ratio of quad size to the median")
     p.add_argument("--halve", action="store_true",
                    help="cut the proxy at the symmetry plane, solve and remesh one half with the quads ending "
                         "square-on at the cut, mirror and weld (needs --symmetry or the mesh's X symmetry on)")
@@ -703,8 +707,28 @@ def seam_report(mesh, remesh, axis, width):
     return {"seam_vertices": int(on_seam.sum()), "seam_not_valence_4": int((valence[on_seam] != 4).sum())}
 
 
+def sizing_field(k1, k2, edges, tris, co, target, power, span, rounds=20):
+    """A quad edge length per vertex from curvature: shorter where the surface turns more. Relative size is
+    (median curvature / curvature) ** power, clamped to [1/span, span] and smoothed a little, then scaled
+    once so the mesh comes out with about `target` faces."""
+    curvature = np.abs(k1) + np.abs(k2)
+    reference = max(float(np.median(curvature)), 1e-12)
+    relative = np.clip((reference / np.maximum(curvature, 1e-12)) ** power, 1.0 / span, span)
+    count = np.bincount(edges.ravel(), minlength=len(co))
+    for _ in range(rounds):
+        mean = (np.bincount(edges[:, 0], weights=relative[edges[:, 1]], minlength=len(co))
+                + np.bincount(edges[:, 1], weights=relative[edges[:, 0]], minlength=len(co))) / np.maximum(count, 1)
+        relative = 0.5 * (relative + mean)
+    a, b, c = co[tris[:, 0]], co[tris[:, 1]], co[tris[:, 2]]
+    areas = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1)
+    per_face = relative[tris].mean(axis=1)
+    unit = float((areas / per_face ** 2).sum())   # faces the mesh would have at relative size 1
+    base = (unit / target) ** 0.5
+    return relative * base, relative
+
+
 def run_engine(name, proxy, source, target, remesh, instant, directions=None, confidence=None, is_capsule=False,
-               freeze=False, positions=None, mirror_axis=None, quad=0.0):
+               freeze=False, positions=None, mirror_axis=None, quad=0.0, edge_length=None):
     """The kit's engine on a copy of the proxy (at the smoothed positions the field was computed on, when
     given, so the engine's tangent planes are the field's), steered by the field when given, projected onto
     the source."""
@@ -717,7 +741,8 @@ def run_engine(name, proxy, source, target, remesh, instant, directions=None, co
         mesh.update()
     stats = instant.remesh(mesh, target // 2 if mirror_axis is not None else target, pure_quad=True,
                            orientation=directions, orientation_weight=confidence, freeze_orientation=freeze,
-                           align_to_boundaries=mirror_axis is not None, fill_holes=mirror_axis is None)
+                           align_to_boundaries=mirror_axis is not None, fill_holes=mirror_axis is None,
+                           edge_length=edge_length)
     seam = {}
     if mirror_axis is not None:
         seam["merged_at_seam"] = mirror_and_weld(mesh, mirror_axis, 0.3 * quad)
@@ -781,6 +806,12 @@ def main():
     tx, ty = tangent_bases(smooth, normals, edges)
     theta, k1, k2 = principal_directions(smooth, normals, edges, tx, ty)
     anisotropy = confidence_of(k1, k2, quad)
+    sizing = None
+    if args.adaptive > 0.0:
+        sizing, relative = sizing_field(k1, k2, edges, tris, smooth, args.target, args.adaptive, args.adaptive_span)
+        proxy.data.attributes.new("quad_size", 'FLOAT', 'POINT').data.foreach_set("value", sizing.astype(np.float32))
+        print("FIELD sizing: edge length %.4f to %.4f (median quad %.4f), relative %.2f to %.2f, share under 0.5: %.2f, over 2: %.2f"
+              % (sizing.min(), sizing.max(), quad, relative.min(), relative.max(), (relative < 0.5).mean(), (relative > 2.0).mean()), flush=True)
     weights = cotan_weights(smooth, tris, edge_of_side)
     r, r1 = connection(smooth, edges, tx, ty)
     d = np.exp(4j * theta)
@@ -811,7 +842,7 @@ def main():
         else:
             is_capsule = args.shape == "capsule" and not bpy.data.filepath
             row = run_engine("engine free", proxy, source, args.target, remesh_module, instant_module, is_capsule=is_capsule,
-                             positions=smooth, mirror_axis=mirror_axis, quad=quad)
+                             positions=smooth, mirror_axis=mirror_axis, quad=quad, edge_length=sizing)
             print("FIELD engine free " + json.dumps(row), flush=True)
             results.append({"engine": "free", **row})
     for align in (float(a) for a in args.align.split(",")):
@@ -894,6 +925,7 @@ def main():
                                  directions.astype(np.float32),
                                  np.ones(len(co), dtype=np.float32) if args.pin_all else anisotropy.astype(np.float32),
                                  freeze=args.pin_all, positions=smooth, mirror_axis=mirror_axis, quad=quad,
+                                 edge_length=sizing,
                                  is_capsule=args.shape == "capsule" and not bpy.data.filepath)
             print("FIELD engine align %g " % align + json.dumps(steered), flush=True)
             results.append({"engine": "align %g" % align, **steered})

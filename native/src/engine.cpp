@@ -62,7 +62,8 @@ struct Result {
 static Result run(const float *vertices_in, size_t n_vertices, const int32_t *faces_in, size_t n_faces,
                   int face_count, int rosy, int posy, float crease_angle, bool extrinsic,
                   bool align_to_boundaries, int smooth_iter, bool pure_quad, bool deterministic,
-                  const float *orientation, const float *orientation_weight, bool freeze_orientation) {
+                  const float *orientation, const float *orientation_weight, bool freeze_orientation,
+                  const float *edge_length) {
     auto started = std::chrono::steady_clock::now();
     Result out;
 
@@ -81,6 +82,12 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
         face_count = std::max<int>(1, (int) n_vertices / 16);
     Float face_area = stats.mSurfaceArea / face_count;
     Float scale = posy == 4 ? std::sqrt(face_area) : (2 * std::sqrt(face_area * std::sqrt(1.f / 3.f)));
+    if (edge_length != nullptr) {  // a sizing field: the global scale becomes its mean, used where no vertex applies
+        double total = 0.0;
+        for (size_t i = 0; i < n_vertices; ++i)
+            total += edge_length[i];
+        scale = (Float) (total / std::max<size_t>(n_vertices, 1));
+    }
 
     /* Subdivide the mesh if it is too coarse for the asked edge length (as batch.cpp does). New vertices
        go at the end, so the caller's per-vertex constraints still line up with the first n_vertices. */
@@ -101,6 +108,36 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
     compute_dual_vertex_areas(F, V, V2E, E2E, nonManifold, A);
 
     MultiResolutionHierarchy mRes;
+    if (edge_length != nullptr) {
+        /* The sizing field, one value per vertex; vertices the subdivision added take a neighbour's. */
+        size_t total = V.cols();
+        VectorXf S(total);
+        std::vector<bool> known(total, false);
+        for (size_t i = 0; i < std::min<size_t>(n_vertices, total); ++i) {
+            S[i] = std::max(edge_length[i], 1e-6f);
+            known[i] = true;
+        }
+        for (int pass = 0; pass < 32; ++pass) {
+            size_t filled = 0;
+            for (size_t i = 0; i < total; ++i) {
+                if (known[i])
+                    continue;
+                for (const Link *link = adj[i]; link != adj[i + 1]; ++link)
+                    if (known[link->id]) {
+                        S[i] = S[link->id];
+                        known[i] = true;
+                        ++filled;
+                        break;
+                    }
+            }
+            if (!filled)
+                break;
+        }
+        for (size_t i = 0; i < total; ++i)
+            if (!known[i])
+                S[i] = scale;
+        mRes.setS(std::move(S));
+    }
     mRes.setE2E(std::move(E2E));
     mRes.setAdj(std::move(adj));
     mRes.setF(std::move(F));
@@ -270,13 +307,15 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
 static nb::dict remesh(Points vertices, Triangles faces, int target_faces, int rosy, int posy, float crease_angle,
                        bool extrinsic, bool align_to_boundaries, int smooth_iterations, bool pure_quad,
                        bool deterministic, std::optional<Points> orientation, std::optional<Weights> orientation_weight,
-                       bool freeze_orientation, bool quiet) {
+                       bool freeze_orientation, std::optional<Weights> edge_length, bool quiet) {
     if (faces.shape(0) == 0)
         throw std::runtime_error("the mesh has no faces");
     if (orientation && orientation->shape(0) != vertices.shape(0))
         throw std::runtime_error("orientation needs one row per vertex");
     if (orientation_weight && orientation_weight->shape(0) != vertices.shape(0))
         throw std::runtime_error("orientation_weight needs one value per vertex");
+    if (edge_length && edge_length->shape(0) != vertices.shape(0))
+        throw std::runtime_error("edge_length needs one value per vertex");
     int face_count = pure_quad && posy == 4 ? std::max(1, target_faces / 4) : target_faces;
     Result out;
     {
@@ -285,7 +324,8 @@ static nb::dict remesh(Points vertices, Triangles faces, int target_faces, int r
         out = run(vertices.data(), vertices.shape(0), faces.data(), faces.shape(0), face_count, rosy, posy,
                   crease_angle, extrinsic, align_to_boundaries, smooth_iterations, pure_quad, deterministic,
                   orientation ? orientation->data() : nullptr,
-                  orientation_weight ? orientation_weight->data() : nullptr, freeze_orientation);
+                  orientation_weight ? orientation_weight->data() : nullptr, freeze_orientation,
+                  edge_length ? edge_length->data() : nullptr);
     }
     nb::dict result;
     size_t n = out.vertices.size() / 3;
@@ -306,7 +346,7 @@ NB_MODULE(_engine, m) {
           nb::arg("align_to_boundaries") = false, nb::arg("smooth_iterations") = 2, nb::arg("pure_quad") = true,
           nb::arg("deterministic") = true, nb::arg("orientation").none() = nb::none(),
           nb::arg("orientation_weight").none() = nb::none(), nb::arg("freeze_orientation") = false,
-          nb::arg("quiet") = true,
+          nb::arg("edge_length").none() = nb::none(), nb::arg("quiet") = true,
           "Remesh triangles (n x 3 float32 vertices, m x 3 int32 faces) into quads. Returns a dict with "
           "vertices, corners (flat), sizes (per face), singularities and seconds.");
 }

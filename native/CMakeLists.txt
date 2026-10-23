@@ -30,6 +30,7 @@ FetchContent_Declare(instant_meshes
   GIT_SHALLOW    OFF
   # Our changes to the library live in patches/ (see each file's header); applied once, after the clone.
   PATCH_COMMAND  git apply --ignore-whitespace ${CMAKE_CURRENT_SOURCE_DIR}/patches/0001-cap-extraction-step5.patch
+                                                ${CMAKE_CURRENT_SOURCE_DIR}/patches/0002-per-vertex-scale.patch
   UPDATE_DISCONNECTED ON
   SOURCE_SUBDIR  cmake-not-used)   # its own CMakeLists builds the viewer and wants nanogui: never entered
 # Eigen 3.4 (MPL-2, header-only). Instant Meshes expects the copy inside nanogui, which is not fetched.

@@ -1,0 +1,185 @@
+diff --git a/src/extract.cpp b/src/extract.cpp
+index 5a38653..1459c2f 100644
+--- a/src/extract.cpp
++++ b/src/extract.cpp
+@@ -37,6 +37,8 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+               bool snap_vertices) {
+ 
+     Float scale = mRes.scale(), inv_scale = 1 / scale;
++    const VectorXf *S = mRes.hasScale() ? &mRes.S(0) : nullptr;  /* Sculpt Kit: per-vertex scale */
++    VectorXf S_new;  /* the same, per extracted vertex */
+ 
+     auto compat_orientation = rosy == 2 ? compat_orientation_extrinsic_2 :
+         (rosy == 4 ? compat_orientation_extrinsic_4 : compat_orientation_extrinsic_6);
+@@ -72,10 +74,11 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+                             Q.col(i), N.col(i), Q.col(j), N.col(j));
+ 
+                     Float error = 0;
++                    const Float sc = S ? 0.5f * ((*S)[i] + (*S)[j]) : scale;
+                     std::pair<Vector2i, Vector2i> shift = compat_position(
+                             V.col(i), N.col(i), Q_rot.first, O.col(i),
+                             V.col(j), N.col(j), Q_rot.second, O.col(j),
+-                            scale, inv_scale, &error);
++                            sc, 1.0f / sc, &error);
+ 
+                     Vector2i absDiff = (shift.first-shift.second).cwiseAbs();
+ 
+@@ -269,6 +272,10 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+         {
+             Eigen::VectorXf cluster_weight(nVertices);
+             cluster_weight.setZero();
++            if (S) {
++                S_new.resize(nVertices);
++                S_new.setZero();
++            }
+ 
+             tbb::blocked_range<uint32_t> range(0u, V.cols(), GRAIN_SIZE);
+             tbb::spin_mutex mutex;
+@@ -280,7 +287,10 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+                         continue;
+                     uint32_t j = it->second;
+ 
+-                    Float weight = std::exp(-(O.col(i)-V.col(i)).squaredNorm() * inv_scale * inv_scale * 9);
++                    const Float isc = S ? 1.0f / (*S)[i] : inv_scale;
++                    Float weight = std::exp(-(O.col(i)-V.col(i)).squaredNorm() * isc * isc * 9);
++                    if (S)
++                        atomicAdd(&S_new[j], (*S)[i] * weight);
+                     if (COw.size() != 0 && COw[i] != 0) {
+                         tbb::spin_mutex::scoped_lock lock(mutex);
+                         crease_out.insert(j);
+@@ -306,6 +316,8 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+                 }
+                 O_new.col(i) /= cluster_weight[i];
+                 N_new.col(i).normalize();
++                if (S)
++                    S_new[i] /= cluster_weight[i];
+             }
+ 
+             cout << "done. (took " << timeString(timer.reset()) << ")" << endl;
+@@ -345,7 +357,7 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+                             if (a > std::max(b, c)) {
+                                 Float s = 0.5f * (a+b+c);
+                                 Float height = 2*std::sqrt(s*(s-a)*(s-b)*(s-c))/a;
+-                                if (height < thresh)
++                                if (height < (S_new.size() ? 0.3f * S_new[i_id] : thresh))
+                                     candidates.push_back(std::make_tuple(height, i_id, j_id, k_id));
+                             }
+                         }
+@@ -375,8 +387,9 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+                     Float height = 2*std::sqrt(s*(s-a)*(s-b)*(s-c))/a;
+                     if (height != std::get<0>(t))
+                         continue;
+-                    if ((p_i-p_j).norm() < thresh || (p_i-p_k).norm() < thresh) {
+-                        uint32_t merge_id = (p_i-p_j).norm() < thresh ? j : k;
++                    const Float thresh_i = S_new.size() ? 0.3f * S_new[i] : thresh;
++                    if ((p_i-p_j).norm() < thresh_i || (p_i-p_k).norm() < thresh_i) {
++                        uint32_t merge_id = (p_i-p_j).norm() < thresh_i ? j : k;
+                         O_new.col(i) = (O_new.col(i) + O_new.col(merge_id)) * 0.5f;
+                         N_new.col(i) = (N_new.col(i) + N_new.col(merge_id)) * 0.5f;
+                         std::set<uint32_t> adj_updated;
+diff --git a/src/field.cpp b/src/field.cpp
+index 4d986aa..f83e763 100644
+--- a/src/field.cpp
++++ b/src/field.cpp
+@@ -901,6 +901,7 @@ template <typename CompatFunctor, typename RoundFunctor> static inline Float opt
+     const AdjacencyMatrix &adj = mRes.adj(level);
+     const MatrixXf &N = mRes.N(level), &Q = mRes.Q(level), &V = mRes.V(level);
+     const Float scale = mRes.scale(), inv_scale = 1.0f / scale;
++    const VectorXf *S = mRes.hasScale() ? &mRes.S(level) : nullptr;  /* Sculpt Kit: per-vertex scale */
+     const std::vector<uint32_t> *phase = nullptr;
+     const MatrixXf &CQ = mRes.CQ(level);
+     const MatrixXf &CO = mRes.CO(level);
+@@ -933,8 +934,9 @@ template <typename CompatFunctor, typename RoundFunctor> static inline Float opt
+                     q_j.normalize();
+                 #endif
+ 
++                const Float sc = S ? 0.5f * ((*S)[i] + (*S)[j]) : scale, isc = 1.0f / sc;
+                 std::pair<Vector3f, Vector3f> value = compat_functor(
+-                    v_i, n_i, q_i, sum, v_j, n_j, q_j, o_j, scale, inv_scale);
++                    v_i, n_i, q_i, sum, v_j, n_j, q_j, o_j, sc, isc);
+ 
+                 sum = value.first*weight_sum + value.second*weight;
+                 weight_sum += weight;
+@@ -955,7 +957,7 @@ template <typename CompatFunctor, typename RoundFunctor> static inline Float opt
+             }
+ 
+             if (weight_sum > 0)
+-                O.col(i) = round_functor(sum, q_i, n_i, v_i, scale, inv_scale);
++                O.col(i) = round_functor(sum, q_i, n_i, v_i, S ? (*S)[i] : scale, S ? 1.0f / (*S)[i] : inv_scale);
+         }
+     };
+ 
+@@ -986,7 +988,7 @@ template <typename CompatFunctor, typename RoundFunctor> static inline Float opt
+                 #endif
+                 const Vector3f t_j = n_j.cross(q_j);
+ 
+-                sum += o_j + scale * (
++                sum += o_j + (S ? 0.5f * ((*S)[i] + (*S)[j]) : scale) * (
+                       q_j * link->ivar[1].translate_u
+                     + t_j * link->ivar[1].translate_v
+                     - q_i * link->ivar[0].translate_u
+@@ -1171,6 +1173,7 @@ static inline void freeze_ivars_positions_impl(MultiResolutionHierarchy &mRes,
+     const AdjacencyMatrix &adj = mRes.adj(level);
+     const MatrixXf &N = mRes.N(level), &Q = mRes.Q(level), &V = mRes.V(level), &O = mRes.O(level);
+     const Float scale = mRes.scale(), inv_scale = 1.0f / scale;
++    const VectorXf *S = mRes.hasScale() ? &mRes.S(level) : nullptr;  /* Sculpt Kit: per-vertex scale */
+ 
+     auto map = [&](const tbb::blocked_range<uint32_t> &range) {
+         for (uint32_t i = range.begin(); i<range.end(); ++i) {
+@@ -1189,10 +1192,11 @@ static inline void freeze_ivars_positions_impl(MultiResolutionHierarchy &mRes,
+                     q_j.normalize();
+                 #endif
+ 
++                const Float sc = S ? 0.5f * ((*S)[i] + (*S)[j]) : scale;
+                 std::pair<Vector2i, Vector2i> value = functor(
+                     v_i, n_i, q_i, o_i,
+                     v_j, n_j, q_j, o_j,
+-                    scale, inv_scale, nullptr);
++                    sc, 1.0f / sc, nullptr);
+ 
+                 link->ivar[0].translate_u = value.first.x();
+                 link->ivar[0].translate_v = value.first.y();
+diff --git a/src/hierarchy.cpp b/src/hierarchy.cpp
+index 2882a67..d454c61 100644
+--- a/src/hierarchy.cpp
++++ b/src/hierarchy.cpp
+@@ -451,6 +451,16 @@ void MultiResolutionHierarchy::build(bool deterministic, const ProgressCallback
+         mA.push_back(std::move(A_p));
+         mToUpper.push_back(std::move(toUpper));
+         mToLower.push_back(std::move(toLower));
++        if (hasScale()) {  /* Sculpt Kit: a coarse vertex's scale is the mean of the two it merges */
++            const VectorXf &S = mS[i];
++            const MatrixXu &up = mToUpper[i];
++            VectorXf S_p(mV[i+1].cols());
++            for (uint32_t k=0; k<(uint32_t) S_p.size(); ++k) {
++                Vector2u u = up.col(k);
++                S_p[k] = u[1] == INVALID ? S[u[0]] : 0.5f * (S[u[0]] + S[u[1]]);
++            }
++            mS.push_back(std::move(S_p));
++        }
+         mCO.push_back(MatrixXf());
+         mCOw.push_back(VectorXf());
+         mCQ.push_back(MatrixXf());
+diff --git a/src/hierarchy.h b/src/hierarchy.h
+index 2b3c337..b3d3a70 100644
+--- a/src/hierarchy.h
++++ b/src/hierarchy.h
+@@ -49,6 +49,10 @@ public:
+     inline const MatrixXf &V(int level = 0) const { return mV[level]; }
+     inline const MatrixXf &N(int level = 0) const { return mN[level]; }
+     inline const VectorXf &A(int level = 0) const { return mA[level]; }
++    /* Sculpt Kit: a target edge length per vertex (a sizing field). Empty means the one global scale. */
++    inline bool hasScale() const { return !mS.empty() && mS[0].size() > 0; }
++    inline const VectorXf &S(int level = 0) const { return mS[level]; }
++    inline void setS(VectorXf &&S) { mS.clear(); mS.push_back(std::move(S)); }
+     inline const MatrixXu &toUpper(int level) const { return mToUpper[level]; }
+     inline const VectorXu &toLower(int level) const { return mToLower[level]; }
+     inline const MatrixXf &Q(int level = 0) const { return mQ[level]; }
+@@ -114,6 +118,7 @@ public:
+     std::vector<MatrixXf> mV;
+     std::vector<MatrixXf> mN;
+     std::vector<VectorXf> mA;
++    std::vector<VectorXf> mS;  /* Sculpt Kit: per-vertex scale per level, see hasScale() */
+     std::vector<VectorXu> mToLower;
+     std::vector<MatrixXu> mToUpper;
+     std::vector<MatrixXf> mO;

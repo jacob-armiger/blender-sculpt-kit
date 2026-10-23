@@ -136,6 +136,7 @@ def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=
             deterministic=deterministic, smooth_iterations=smooth_iterations, **steering)
         stats["remesh"] = time.perf_counter() - started
         stats["singularities"] = out["singularities"]
+        stats["vertices_added"] = out.get("vertices_added", 0)
         started = time.perf_counter()
         sizes, corners = out["sizes"], out["corners"]
         starts = np.concatenate([[0], np.cumsum(sizes)[:-1]])

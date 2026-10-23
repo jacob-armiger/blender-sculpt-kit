@@ -55,7 +55,7 @@ template <typename T> nb::ndarray<nb::numpy, T> make_array(std::vector<T> &&valu
 struct Result {
     std::vector<float> vertices;
     std::vector<int32_t> corners, sizes;
-    int singularities = 0;
+    int singularities = 0, vertices_added = 0;
     double seconds = 0.0;
 };
 
@@ -117,13 +117,41 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
        library's own constraints, which its smoother blends with at every level. */
     bool frozen = orientation != nullptr && freeze_orientation;
     if (frozen) {
-        size_t count = std::min<size_t>(n_vertices, mRes.V().cols());
+        size_t total = mRes.V().cols(), count = std::min<size_t>(n_vertices, total);
+        std::vector<bool> known(total, false);
         for (size_t i = 0; i < count; ++i) {
             Vector3f d(orientation[i * 3], orientation[i * 3 + 1], orientation[i * 3 + 2]);
             Vector3f n = mRes.N().col(i);
             d -= n * n.dot(d);
-            if (d.squaredNorm() > 1e-12f)
+            if (d.squaredNorm() > 1e-12f) {
                 mRes.Q().col(i) = d.normalized();
+                known[i] = true;
+            }
+        }
+        /* Vertices the library added when subdividing a coarse input (they come after the caller's) have
+           no direction of their own: they take a known neighbour's, projected into their tangent plane,
+           pass by pass until every vertex has one. Left random they would riddle the field with poles. */
+        const AdjacencyMatrix &adj = mRes.adj(0);
+        for (int pass = 0; pass < 32; ++pass) {
+            size_t filled = 0;
+            for (size_t i = 0; i < total; ++i) {
+                if (known[i])
+                    continue;
+                for (const Link *link = adj[i]; link != adj[i + 1]; ++link) {
+                    if (!known[link->id])
+                        continue;
+                    Vector3f n = mRes.N().col(i), d = mRes.Q().col(link->id);
+                    d -= n * n.dot(d);
+                    if (d.squaredNorm() > 1e-12f) {
+                        mRes.Q().col(i) = d.normalized();
+                        known[i] = true;
+                        ++filled;
+                        break;
+                    }
+                }
+            }
+            if (!filled)
+                break;
         }
         mRes.propagateSolution(rosy);
         mRes.setFrozenQ(true);
@@ -189,6 +217,7 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
     std::map<uint32_t, uint32_t> sing;
     compute_orientation_singularities(mRes, sing, extrinsic, rosy);
     out.singularities = (int) sing.size();
+    out.vertices_added = (int) mRes.V().cols() - (int) n_vertices;  // from the library's own subdivision
     optimizer.optimizePositions(-1);
     optimizer.notify();
     optimizer.wait();
@@ -264,6 +293,7 @@ static nb::dict remesh(Points vertices, Triangles faces, int target_faces, int r
     result["corners"] = make_array(std::move(out.corners), out.corners.size(), 0);
     result["sizes"] = make_array(std::move(out.sizes), out.sizes.size(), 0);
     result["singularities"] = out.singularities;
+    result["vertices_added"] = out.vertices_added;
     result["seconds"] = out.seconds;
     return result;
 }

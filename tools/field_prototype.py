@@ -479,18 +479,27 @@ def generators(tris, edges, edge_of_side):
                 parent[w], parent_edge[w] = v, e
                 in_tree[e] = True
                 order.append(w)
-    # dual tree over faces, crossing only edges not in the vertex tree
+    # dual tree over faces, crossing only edges not in the vertex tree. A boundary edge joins its one face to
+    # a virtual face standing for everything outside, so a boundary is one node of the dual graph and its
+    # edges are not each taken for a generator.
+    outside = len(tris)
     face_of_edge = [[] for _ in range(len(edges))]
     for f in range(len(tris)):
         for side in range(3):
             face_of_edge[edge_of_side[f, side]].append(f)
-    seen = np.zeros(len(tris), dtype=bool)
+    for e in range(len(edges)):
+        if len(face_of_edge[e]) == 1:
+            face_of_edge[e].append(outside)
+    edges_of_face = [[] for _ in range(len(tris) + 1)]
+    for e, faces in enumerate(face_of_edge):
+        for f in faces:
+            edges_of_face[f].append(e)
+    seen = np.zeros(len(tris) + 1, dtype=bool)
     in_dual = np.zeros(len(edges), dtype=bool)
     seen[0] = True
     queue = [0]
     for f in queue:
-        for side in range(3):
-            e = edge_of_side[f, side]
+        for e in edges_of_face[f]:
             if in_tree[e]:
                 continue
             for g in face_of_edge[e]:
@@ -714,7 +723,8 @@ def run_engine(name, proxy, source, target, remesh, instant, directions=None, co
     ob = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(ob)
     row = {"seconds": round(time.perf_counter() - started, 2), "faces": len(mesh.polygons),
-           "singularities": stats.get("singularities"), "pinch_points": remesh._pinch_points(mesh),
+           "singularities": stats.get("singularities"), "vertices_added": stats.get("vertices_added"),
+           "pinch_points": remesh._pinch_points(mesh),
            "unfolded": unfolded, "open_edges": remesh._open_edges(mesh), **seam}
     if is_capsule:
         row["quad_axis_alignment"] = quad_axis_alignment(mesh, remesh)

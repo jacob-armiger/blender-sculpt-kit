@@ -52,6 +52,11 @@ def parse():
                    help="cancel +1/-1 singularity pairs closer than this many quads by pinning the patch between "
                         "them to one direction and solving again; 0 disables")
     p.add_argument("--prune-rounds", type=int, default=2)
+    p.add_argument("--trivial", type=float, default=0.0,
+                   help="after the aligned solve, keep its singularities minus +1/-1 pairs closer than this many "
+                        "quads and build the smoothest field with exactly those (a trivial connection); 0 disables")
+    p.add_argument("--trivial-align", type=float, default=0.0,
+                   help="re-align that field to curvature with this weight on the adjusted connection")
     p.add_argument("--pin-all", action="store_true",
                    help="freeze the engine's orientation field to ours (written in, never optimised) instead of "
                         "handing it over as soft constraints weighted by confidence")
@@ -412,6 +417,183 @@ def pair_pins(z, index, tris, co, normals, tx, ty, quad, reach):
     return d, mask, len(pairs)
 
 
+def choose_indices(index, tris, co, quad, reach, euler):
+    """The singularities the trivial connection will be given: the field's own, with +1/-1 pairs closer than
+    `reach` quads dropped outright (the exact form of pruning), and the sum repaired to 4 times the Euler
+    characteristic by dropping surplus ones nearest to another singularity."""
+    k = index.copy()
+    centres = co[tris].mean(axis=1)
+    plus, minus = np.flatnonzero(k > 0), np.flatnonzero(k < 0)
+    dropped = 0
+    if len(plus) and len(minus):
+        gaps = np.linalg.norm(centres[plus][:, None, :] - centres[minus][None, :, :], axis=2)
+        used_plus, used_minus = set(), set()
+        for flat in np.argsort(gaps, axis=None):
+            i, j = divmod(int(flat), len(minus))
+            if gaps[i, j] > reach * quad:
+                break
+            if i in used_plus or j in used_minus:
+                continue
+            used_plus.add(i)
+            used_minus.add(j)
+            k[plus[i]] -= 1
+            k[minus[j]] += 1
+            dropped += 2
+    surplus = int(k.sum() - 4 * euler)
+    while surplus != 0:
+        sign = 1 if surplus > 0 else -1
+        candidates = np.flatnonzero(k * sign > 0)
+        if not len(candidates):
+            break
+        others = np.flatnonzero(k != 0)
+        gaps = np.linalg.norm(centres[candidates][:, None, :] - centres[others][None, :, :], axis=2)
+        gaps[gaps == 0] = np.inf
+        pick = candidates[np.argmin(gaps.min(axis=1))]
+        k[pick] -= sign
+        surplus -= sign
+        dropped += 1
+    return k, dropped
+
+
+def generators(tris, edges, edge_of_side):
+    """Tree-cotree: a spanning tree of the vertices, a spanning tree of the faces over the edges the first
+    left free, and the edges in neither, each of which closes one homology generator through the vertex tree.
+    Returns the vertex tree (parent vertex and edge per vertex, in BFS order) and the generator edges."""
+    n_vertices = len(np.unique(tris))
+    n_vertices = max(n_vertices, int(edges.max()) + 1)
+    neighbours = [[] for _ in range(n_vertices)]
+    for e, (a, b) in enumerate(edges):
+        neighbours[a].append((b, e))
+        neighbours[b].append((a, e))
+    parent = np.full(n_vertices, -1, dtype=np.int64)
+    parent_edge = np.full(n_vertices, -1, dtype=np.int64)
+    in_tree = np.zeros(len(edges), dtype=bool)
+    order = [0]
+    parent[0] = 0
+    for v in order:  # BFS: the list grows as it is walked
+        for w, e in neighbours[v]:
+            if parent[w] < 0:
+                parent[w], parent_edge[w] = v, e
+                in_tree[e] = True
+                order.append(w)
+    # dual tree over faces, crossing only edges not in the vertex tree
+    face_of_edge = [[] for _ in range(len(edges))]
+    for f in range(len(tris)):
+        for side in range(3):
+            face_of_edge[edge_of_side[f, side]].append(f)
+    seen = np.zeros(len(tris), dtype=bool)
+    in_dual = np.zeros(len(edges), dtype=bool)
+    seen[0] = True
+    queue = [0]
+    for f in queue:
+        for side in range(3):
+            e = edge_of_side[f, side]
+            if in_tree[e]:
+                continue
+            for g in face_of_edge[e]:
+                if not seen[g]:
+                    seen[g] = True
+                    in_dual[e] = True
+                    queue.append(g)
+    loose = np.flatnonzero(~in_tree & ~in_dual)
+    return parent, parent_edge, np.array(order), loose
+
+
+def tree_path(parent, parent_edge, a, b):
+    """Edges (with +1 when walked from edges[e,0] to edges[e,1]) along the vertex tree from a to b."""
+    up_a, up_b = [], []
+    seen = {}
+    v = a
+    while True:
+        seen[v] = len(up_a)
+        if parent[v] == v:
+            break
+        up_a.append(v)
+        v = parent[v]
+    w = b
+    while w not in seen:
+        up_b.append(w)
+        w = parent[w]
+    return up_a[:seen[w]], up_b
+
+
+def trivial_connection(z_index_target, tris, edges, edge_of_side, r1, euler, iterations=2000):
+    """The smallest per-edge adjustment of the connection that puts exactly the given indices on the faces
+    (Crane, Desbrun, Schroder 2010), with the holonomy around each homology generator rounded to a quarter
+    turn so the field closes up around handles. Returns the adjustment (radians per edge, +1 direction) and
+    the vertex tree for walking the field out."""
+    n_e = len(edges)
+    parent, parent_edge, order, loose = generators(tris, edges, edge_of_side)
+    base = np.angle(r1)  # transport angle along each edge in its +1 direction
+    # constraint rows: faces (sum of signed adjustments = 2 pi k / 4 - face holonomy), then generators
+    sign = np.where(edges[edge_of_side, 0] == tris, 1.0, -1.0)  # (faces, 3): walked a -> b along side?
+    face_hol = np.angle(np.exp(1j * (sign * base[edge_of_side]).sum(axis=1)))
+    b_faces = 2 * np.pi * z_index_target / 4.0 - face_hol
+    cycles = []  # generator cycles as (edge ids, signs)
+    for e in loose:
+        a, b = edges[e]
+        # cycle: a -> tree root -> b, then b -> a along e; walked as a path a ... b plus e reversed
+        up_a, up_b = tree_path(parent, parent_edge, a, b)
+        es, ss = [], []
+        for v in up_a:  # from a up to the meeting point: edge parent_edge[v], walked v -> parent[v]
+            pe = parent_edge[v]
+            es.append(pe); ss.append(1.0 if edges[pe, 0] == v else -1.0)
+        for v in reversed(up_b):  # down from the meeting point to b: walked parent[v] -> v
+            pe = parent_edge[v]
+            es.append(pe); ss.append(1.0 if edges[pe, 0] == parent[v] else -1.0)
+        es.append(e); ss.append(-1.0)  # b -> a
+        es, ss = np.array(es), np.array(ss)
+        hol = (ss * base[es]).sum()
+        target = np.round(hol / (np.pi / 2)) * (np.pi / 2)  # a cross field only needs a quarter turn
+        cycles.append((es, ss, target - hol))
+    b = np.concatenate([b_faces, np.array([c[2] for c in cycles])])
+
+    def A(x):
+        out = np.empty(len(tris) + len(cycles))
+        out[:len(tris)] = (sign * x[edge_of_side]).sum(axis=1)
+        for i, (es, ss, _) in enumerate(cycles):
+            out[len(tris) + i] = (ss * x[es]).sum()
+        return out
+
+    def At(y):
+        x = np.zeros(n_e)
+        for side in range(3):
+            x += np.bincount(edge_of_side[:, side], weights=sign[:, side] * y[:len(tris)], minlength=n_e)
+        for i, (es, ss, _) in enumerate(cycles):
+            np.add.at(x, es, ss * y[len(tris) + i])
+        return x
+
+    y = np.zeros(len(b))
+    rr_vec = b - A(At(y))
+    p = rr_vec.copy()
+    rr = rr_vec @ rr_vec
+    b_norm = max(np.sqrt(b @ b), 1e-30)
+    steps = 0
+    for steps in range(1, iterations + 1):
+        ap = A(At(p))
+        alpha = rr / max(p @ ap, 1e-300)
+        y += alpha * p
+        rr_vec -= alpha * ap
+        rr_new = rr_vec @ rr_vec
+        if np.sqrt(rr_new) < 1e-8 * b_norm:
+            break
+        p = rr_vec + (rr_new / rr) * p
+        rr = rr_new
+    x = At(y)
+    return x, parent, parent_edge, order, len(cycles), steps, float(np.sqrt(rr_new) / b_norm)
+
+
+def walk_field(x, parent, parent_edge, order, edges, r1):
+    """A parallel field under the adjusted connection: angle 0 at the root, carried out along the tree."""
+    theta = np.zeros(len(parent))
+    base = np.angle(r1)
+    for v in order[1:]:
+        e, u = parent_edge[v], parent[v]
+        forward = edges[e, 0] == u
+        theta[v] = theta[u] + (base[e] + x[e]) * (1.0 if forward else -1.0)
+    return np.exp(4j * theta)
+
+
 def field_vectors(theta, tx, ty, n_sym=4):
     """The angle of a 4-fold field value (as a complex number's argument) back to a 3D tangent direction."""
     return np.cos(theta)[:, None] * tx + np.sin(theta)[:, None] * ty
@@ -572,6 +754,37 @@ def main():
                 pruned.append({"pairs": pair_count, "pinned": int(pin_mask.sum()), "singularities": int((index != 0).sum())})
             row["pruning"] = pruned
             row["singularities_after_pruning"] = int((index != 0).sum())
+        if args.trivial > 0.0 and align > 0.0:
+            # Trivial connection: keep the field's singularities minus close pairs, and build the smoothest
+            # field that has exactly those; then re-align softly on the adjusted connection.
+            started_tc = time.perf_counter()
+            euler = len(co) - len(edges) + len(tris)
+            target, dropped = choose_indices(index, tris, smooth, quad, args.trivial, euler)
+            x, parent, parent_edge, order, n_gen, tc_steps, residual = trivial_connection(target, tris, edges, edge_of_side, r1, euler)
+            r1_adjusted = r1 * np.exp(1j * x)
+            r_adjusted = r1_adjusted ** 4
+            z = walk_field(x, parent, parent_edge, order, edges, r1)  # walk_field adds x itself
+            index = face_indices(z, tris, edge_of_side, edges, r_adjusted, r1_adjusted)
+            # checks: the adjusted connection's face holonomies against the targets, and the walked field's
+            # per-edge mismatch (zero on tree edges by construction, zero mod a quarter turn elsewhere)
+            sgn = np.where(edges[edge_of_side, 0] == tris, 1.0, -1.0)
+            hol = (sgn * (np.angle(r1) + x)[edge_of_side]).sum(axis=1)
+            face_err = np.abs(np.angle(np.exp(1j * (hol - 2 * np.pi * target / 4.0))))
+            unit = z / np.abs(z)
+            delta = np.angle(unit[edges[:, 1]] * np.conj(r_adjusted * unit[edges[:, 0]]))
+            row_check = {"face_error_max_deg": float(np.degrees(face_err.max())), "faces_off": int((face_err > 0.05).sum()),
+                         "edges_off": int((np.abs(delta) > 0.05).sum())}
+            row["trivial"] = {"target_singularities": int((target != 0).sum()), "dropped": dropped, "generators": n_gen,
+                              "cg_steps": tc_steps, "residual": residual, "adjustment_rms_deg": float(np.degrees(np.sqrt((x ** 2).mean()))),
+                              "singularities": int((index != 0).sum()), "index_sum": int(index.sum()),
+                              "seconds": round(time.perf_counter() - started_tc, 2), **row_check}
+            if args.trivial_align > 0.0:
+                weight = args.trivial_align * anisotropy
+                weight[pinned] = args.hard
+                z, steps = aligned_field(edges, weights, r_adjusted, mass, d, weight, z, args.cg_iterations)
+                index = face_indices(z, tris, edge_of_side, edges, r_adjusted, r1_adjusted)
+                row["trivial"]["singularities_after_realign"] = int((index != 0).sum())
+            print("FIELD trivial " + json.dumps(row["trivial"]), flush=True)
         if args.shape == "capsule" and not bpy.data.filepath:
             # How well the field follows the capsule's axis in its middle band: cos of 4 times the angle
             # between the field and the axis projected onto the tangent plane, 1 when aligned, -1 at 45 degrees.

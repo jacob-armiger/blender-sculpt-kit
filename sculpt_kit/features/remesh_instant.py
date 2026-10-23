@@ -1,0 +1,112 @@
+"""Instant Meshes as a second engine for Repairing Remesh (the Option B experiment).
+
+Instant Meshes (Jakob et al. 2015, BSD-3) comes as the pyinstantmeshes wheel, bundled in ../wheels and listed
+in the manifest. Its remesh() function is not used: it writes the mesh to a temporary OBJ, runs the remesher,
+and reads the result back through a loader that splits every quad into two triangles, so the quads never
+reach Python. remesh_file() leaves the output OBJ for us to parse, which keeps the quads, and its own read-back
+of that file (which raises on faces with more than four sides) is caught and ignored.
+
+Two things the engine does differently from QuadriFlow:
+  - pure quads come from subdividing every face of its quad-dominant result into four, so it is asked for a
+    quarter of the target count;
+  - it has no seed and no symmetry. A new attempt is a different smoothing, not a different seed.
+"""
+import os
+import tempfile
+import time
+
+import numpy as np
+
+try:
+    import pyinstantmeshes
+except ImportError:  # the wheel is not installed for this platform
+    pyinstantmeshes = None
+
+
+def available():
+    return pyinstantmeshes is not None
+
+
+def _triangles(mesh):
+    """The mesh as triangles, through its loop triangles (fast, and n-gons come along)."""
+    mesh.calc_loop_triangles()
+    tris = np.empty(len(mesh.loop_triangles) * 3, dtype=np.int32)
+    mesh.loop_triangles.foreach_get("vertices", tris)
+    return tris.reshape(-1, 3)
+
+
+def _write_obj(path, co, faces):
+    with open(path, "w") as f:
+        np.savetxt(f, co, fmt="v %.7g %.7g %.7g")
+        np.savetxt(f, faces + 1, fmt="f " + " ".join(["%d"] * faces.shape[1]))
+
+
+def _read_obj(path):
+    """Vertices and faces grouped by side count, with unused vertices dropped."""
+    verts, faces = [], {}
+    with open(path) as f:
+        for line in f:
+            if line.startswith("v "):
+                verts.append(line.split()[1:4])
+            elif line.startswith("f "):
+                idx = [int(p.split("/")[0]) - 1 for p in line.split()[1:]]
+                faces.setdefault(len(idx), []).append(idx)
+    co = np.array(verts, dtype=np.float32).reshape(-1, 3)
+    faces = {n: np.array(fs, dtype=np.int32) for n, fs in faces.items()}
+    used = np.zeros(len(co), dtype=bool)
+    for fs in faces.values():
+        used[fs.ravel()] = True
+    renumber = np.cumsum(used) - 1
+    return co[used], {n: renumber[fs] for n, fs in faces.items()}
+
+
+def _replace_geometry(mesh, co, faces):
+    """Give the mesh these vertices and faces (a dict of side count -> index array), keeping nothing else."""
+    sizes = sorted(faces)
+    loop_total = np.concatenate([np.full(len(faces[n]), n, dtype=np.int32) for n in sizes])
+    corners = np.concatenate([faces[n].ravel() for n in sizes])
+    mesh.clear_geometry()
+    mesh.vertices.add(len(co))
+    mesh.vertices.foreach_set("co", np.ascontiguousarray(co, dtype=np.float32).ravel())
+    mesh.loops.add(len(corners))
+    mesh.loops.foreach_set("vertex_index", corners)
+    mesh.polygons.add(len(loop_total))
+    mesh.polygons.foreach_set("loop_start", np.concatenate([[0], np.cumsum(loop_total)[:-1]]).astype(np.int32))
+    mesh.polygons.foreach_set("loop_total", loop_total)
+    mesh.update(calc_edges=True)
+    mesh.validate()
+
+
+def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=True, smooth_iterations=2):
+    """Rebuild the mesh with Instant Meshes. Returns timings and counts; raises RuntimeError when it fails."""
+    if pyinstantmeshes is None:
+        raise RuntimeError("Instant Meshes is not installed for this platform")
+    co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
+    mesh.attributes["position"].data.foreach_get("vector", co)
+    tris = _triangles(mesh)
+    if not len(tris):
+        raise RuntimeError("the mesh has no faces")
+    stats = {}
+    with tempfile.TemporaryDirectory(prefix="sculptkit_im_") as folder:
+        src, dst = os.path.join(folder, "in.obj"), os.path.join(folder, "out.obj")
+        started = time.perf_counter()
+        _write_obj(src, co.reshape(-1, 3), tris)
+        stats["write"] = time.perf_counter() - started
+        started = time.perf_counter()
+        try:
+            pyinstantmeshes.remesh_file(
+                src, dst, target_face_count=max(1, target_faces // 4) if pure_quad else target_faces,
+                pure_quad=pure_quad, crease_angle=crease_angle, deterministic=deterministic,
+                smooth_iterations=smooth_iterations)
+        except RuntimeError as error:
+            if not os.path.exists(dst):  # the remesh itself failed, not the read-back
+                raise RuntimeError("Instant Meshes failed: %s" % error) from None
+        stats["remesh"] = time.perf_counter() - started
+        started = time.perf_counter()
+        out_co, faces = _read_obj(dst)
+        if not faces:
+            raise RuntimeError("Instant Meshes gave no faces")
+    _replace_geometry(mesh, out_co, faces)
+    stats["rebuild"] = time.perf_counter() - started
+    stats["sides"] = {n: len(fs) for n, fs in sorted(faces.items())}
+    return stats

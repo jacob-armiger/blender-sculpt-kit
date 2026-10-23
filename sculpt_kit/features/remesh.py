@@ -23,11 +23,18 @@ new one is a fresh try from the original sculpt.
 import bmesh
 import bpy
 import numpy as np
-from bpy.props import BoolProperty, FloatProperty, IntProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 from .. import common
+from . import remesh_instant
+
+ENGINES = (
+    ('QUADRIFLOW', "QuadriFlow", "Blender's quad remesher, with the repairs and smoothing of Repairing Remesh"),
+    ('INSTANT', "Instant Meshes", "The Instant Meshes remesher (an experiment): seconds on any mesh, "
+                                  "quads from a quarter-count quad-dominant result, no seed and no symmetry"),
+)
 
 QUADRIFLOW_EDGE_LIMIT = 1e-4  # object.quadriflow_remesh rejects meshes with an edge shorter than this
 SAFE_EDGE = 1e-3              # what the shortest edge is scaled up to before calling it
@@ -358,6 +365,8 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
     preserve_sharp: BoolProperty(name="Preserve Sharp Edges", default=False, options={'SKIP_SAVE'},
                                  description="Keep sharp creases. Left unset, the Sculpt Kit panel's checkbox decides")
     smooth_normals: BoolProperty(name="Smooth Normals", default=True)
+    engine: EnumProperty(name="Engine", items=ENGINES, default='QUADRIFLOW', options={'SKIP_SAVE'},
+                         description="Which remesher lays out the quads. Left unset, the Sculpt Kit panel decides")
 
     @classmethod
     def poll(cls, context):
@@ -371,7 +380,12 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
             self.target_faces = context.scene.sculpt_kit_quad_faces
         if not self.properties.is_property_set("preserve_sharp"):
             self.preserve_sharp = context.scene.sculpt_kit_quad_sharp
+        if not self.properties.is_property_set("engine"):
+            self.engine = context.scene.sculpt_kit_quad_engine
         target, sharp = self.target_faces, self.preserve_sharp
+        if self.engine == 'INSTANT' and not remesh_instant.available():
+            self.report({'ERROR'}, "Instant Meshes is not installed for this platform")
+            return {'CANCELLED'}
         with common.object_mode(context):
             original = ob.data
             surface = BVHTree.FromObject(ob, context.evaluated_depsgraph_get())  # the sculpt, to snap back onto
@@ -383,10 +397,14 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
                 _smooth_for_field(work, target, self.smoothing * (1.5 if attempt else 1.0))
                 scale, repairs = prepare_for_quadriflow(work)
                 try:
-                    result = bpy.ops.object.quadriflow_remesh(
-                        mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
-                        use_preserve_sharp=sharp, smooth_normals=self.smooth_normals,
-                        preserve_attributes=True, seed=self.seed + attempt)
+                    if self.engine == 'INSTANT':
+                        remesh_instant.remesh(work, target, pure_quad=True, crease_angle=50.0 if sharp else -1.0)
+                        result = {'FINISHED'}
+                    else:
+                        result = bpy.ops.object.quadriflow_remesh(
+                            mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
+                            use_preserve_sharp=sharp, smooth_normals=self.smooth_normals,
+                            preserve_attributes=True, seed=self.seed + attempt)
                 except RuntimeError:  # QuadriFlow reports a refusal as an error, not as a cancelled result
                     result = {'CANCELLED'}
                 finally:
@@ -460,6 +478,10 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
         sub = col.row()
         sub.enabled = not blocked
         sub.prop(scene, "sculpt_kit_quad_sharp")
+        if remesh_instant.available():  # the experiment's engine switch shows only where its wheel is installed
+            sub = col.row()
+            sub.enabled = not blocked
+            sub.prop(scene, "sculpt_kit_quad_engine", text="Engine")
         if not blocked:
             common.info(col, "%s \u2192 about %s faces" % (common.face_count(now),
                                                             common.face_count(scene.sculpt_kit_quad_faces)))
@@ -481,6 +503,9 @@ def enable():
         name="Quad Faces", default=5000, min=100, soft_max=100_000, max=2_000_000,
         description="Roughly how many faces Repairing Remesh aims for. Drag across for up to 100 thousand, "
                     "Shift + drag for finer steps, or type a number for more")
+    bpy.types.Scene.sculpt_kit_quad_engine = EnumProperty(
+        name="Engine", items=ENGINES, default='QUADRIFLOW',
+        description="Which remesher Repairing Remesh lays its quads out with")
     for cls in _classes:
         bpy.utils.register_class(cls)
     keymap = common.sculpt_keymap()
@@ -497,3 +522,4 @@ def disable():
     del bpy.types.Scene.sculpt_kit_remesh_resolution
     del bpy.types.Scene.sculpt_kit_quad_faces
     del bpy.types.Scene.sculpt_kit_quad_sharp
+    del bpy.types.Scene.sculpt_kit_quad_engine

@@ -1,0 +1,28 @@
+# Builds the native remesh engine (native/) as one stable-ABI wheel per platform Blender 5.x runs on.
+# Manual for now: run it from the Actions tab, then download the wheelhouse artifact into sculpt_kit/wheels/.
+name: native wheels
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["native/**", ".github/workflows/native-wheels.yml"]
+
+jobs:
+  wheels:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022, ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install cibuildwheel==3.3.0
+      - run: python -m cibuildwheel native --output-dir wheelhouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl

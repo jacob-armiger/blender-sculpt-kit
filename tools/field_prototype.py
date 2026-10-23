@@ -39,6 +39,10 @@ def parse():
     p.add_argument("--smoothing", type=float, default=1.0)
     p.add_argument("--out", default="tests/out/field")
     p.add_argument("--sphere-faces", type=int, default=1_300_000)
+    p.add_argument("--engine", action="store_true",
+                   help="also run the kit's engine on the proxy, free and steered by each field, project the "
+                        "results onto the source and count pinch points (needs Sculpt Kit enabled in this "
+                        "Blender with its own engine wheel: run through the bench profile, see tools/bench_remesh.sh)")
     p.add_argument("--shape", default="sphere", choices=("sphere", "capsule"),
                    help="without a .blend: a noisy sphere (no true curvature direction: alignment can only "
                         "add singularities) or a noisy capsule 3 times as long as wide (alignment should "
@@ -290,6 +294,56 @@ def field_vectors(theta, tx, ty, n_sym=4):
     return np.cos(theta)[:, None] * tx + np.sin(theta)[:, None] * ty
 
 
+def kit_modules():
+    """The enabled Sculpt Kit's remesh modules, or None."""
+    import importlib
+    name = next((k for k in bpy.context.preferences.addons.keys() if k.endswith("sculpt_kit")), None)
+    if name is None:
+        return None, None
+    try:
+        return (importlib.import_module(name + ".features.remesh"),
+                importlib.import_module(name + ".features.remesh_instant"))
+    except ImportError:
+        return None, None
+
+
+def quad_axis_alignment(mesh, remesh):
+    """For the capsule: cos of 4 times the angle between each edge in the middle band and the axis, 1 when the
+    quads run along and around the axis, -1 when they run diagonally."""
+    co = coordinates(mesh)
+    edges = remesh._edges(mesh)
+    mid = 0.5 * (co[edges[:, 0]] + co[edges[:, 1]])
+    band = np.abs(mid[:, 2]) < 0.8
+    e = co[edges[:, 1]] - co[edges[:, 0]]
+    e /= np.maximum(np.linalg.norm(e, axis=1), 1e-20)[:, None]
+    radial = mid.copy()
+    radial[:, 2] = 0.0
+    radial /= np.maximum(np.linalg.norm(radial, axis=1), 1e-20)[:, None]
+    around = np.cross(radial, [0.0, 0.0, 1.0])
+    angle = np.arctan2((e * around).sum(1), e[:, 2])
+    return float(np.cos(4 * angle)[band].mean()) if band.any() else None
+
+
+def run_engine(name, proxy, source, target, remesh, instant, directions=None, confidence=None, is_capsule=False):
+    """The kit's engine on a copy of the proxy, steered by the field when given, projected onto the source."""
+    from mathutils.bvhtree import BVHTree
+    started = time.perf_counter()
+    mesh = proxy.data.copy()
+    mesh.name = name
+    stats = instant.remesh(mesh, target, pure_quad=True, orientation=directions, orientation_weight=confidence)
+    surface = BVHTree.FromObject(source, bpy.context.evaluated_depsgraph_get())
+    remesh._project_and_relax(mesh, surface)
+    unfolded = remesh._unfold(mesh, surface)
+    ob = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(ob)
+    row = {"seconds": round(time.perf_counter() - started, 2), "faces": len(mesh.polygons),
+           "singularities": stats.get("singularities"), "pinch_points": remesh._pinch_points(mesh),
+           "unfolded": unfolded, "open_edges": remesh._open_edges(mesh)}
+    if is_capsule:
+        row["quad_axis_alignment"] = quad_axis_alignment(mesh, remesh)
+    return row
+
+
 def save_field_object(name, co, directions, length):
     """Short line segments along the field at every vertex, as a mesh object."""
     verts = np.concatenate([co - directions * length * 0.5, co + directions * length * 0.5])
@@ -334,6 +388,17 @@ def main():
 
     results = []
     z = None
+    remesh_module = instant_module = None
+    if args.engine:
+        remesh_module, instant_module = kit_modules()
+        if instant_module is None or not instant_module.available():
+            print("FIELD engine: Sculpt Kit with its engine is not enabled in this Blender; skipping", flush=True)
+            instant_module = None
+        else:
+            is_capsule = args.shape == "capsule" and not bpy.data.filepath
+            row = run_engine("engine free", proxy, source, args.target, remesh_module, instant_module, is_capsule=is_capsule)
+            print("FIELD engine free " + json.dumps(row), flush=True)
+            results.append({"engine": "free", **row})
     for align in (float(a) for a in args.align.split(",")):
         started = time.perf_counter()
         if align <= 0.0:
@@ -357,6 +422,12 @@ def main():
         print("FIELD " + json.dumps(row), flush=True)
         directions = field_vectors(np.angle(z) / 4.0, tx, ty)
         save_field_object("field align %g" % align, smooth, directions, quad * 0.8)
+        if instant_module is not None and instant_module.available():
+            steered = run_engine("engine align %g" % align, proxy, source, args.target, remesh_module, instant_module,
+                                 directions.astype(np.float32), anisotropy.astype(np.float32),
+                                 is_capsule=args.shape == "capsule" and not bpy.data.filepath)
+            print("FIELD engine align %g " % align + json.dumps(steered), flush=True)
+            results.append({"engine": "align %g" % align, **steered})
         np.savez(os.path.join(args.out, "field_align_%g.npz" % align), vertices=smooth.astype(np.float32),
                  faces=tris, direction=directions.astype(np.float32), confidence=anisotropy.astype(np.float32),
                  singular_faces=np.flatnonzero(index != 0))

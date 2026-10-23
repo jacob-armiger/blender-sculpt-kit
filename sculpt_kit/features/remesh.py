@@ -330,6 +330,66 @@ def _unfold(mesh, surface, rounds=20):
     return len(found)
 
 
+def _repair_pinches(mesh, surface, rounds=10):
+    """Rebuild the faces around each vertex where six or more edges meet: the vertex is dissolved, which
+    leaves one face with as many sides as it had edges, that face is cut into quads by chords from its
+    lowest-valence corner (and one triangle when the count is odd), and the corners are relaxed along the
+    surface and snapped back onto it. A singularity split in the sense of Peng et al. 2011 ("Connectivity
+    editing for quadrilateral meshes"): poles of valence 4 and 5 in place of one of 6 or more. Returns how
+    many were rebuilt."""
+    rebuilt = 0
+    for _ in range(3):  # poles next to each other are taken one at a time, a pass each
+        before = _pinch_points(mesh)
+        if not before:
+            break
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        poles = [v for v in bm.verts if len(v.link_edges) >= 6]
+        chosen, taken = [], set()
+        for pole in poles:  # no two in one pass share a face, so each n-gon comes from one pole
+            if not any(f.index in taken for f in pole.link_faces):
+                chosen.append(pole)
+                taken.update(f.index for f in pole.link_faces)
+        ring = {v.index for pole in chosen for e in pole.link_edges for v in e.verts}
+        bmesh.ops.dissolve_verts(bm, verts=chosen)
+        for face in [f for f in bm.faces if len(f.verts) > 4]:
+            while face is not None and len(face.verts) > 4:
+                # One chord at a time, always from the corner with the fewest edges, so the new valence spreads
+                # instead of piling onto one corner.
+                corners = face.verts[:]
+                start = min(range(len(corners)), key=lambda i: len(corners[i].link_edges))
+                corners = corners[start:] + corners[:start]
+                cut = bmesh.ops.connect_verts(bm, verts=[corners[0], corners[3]])
+                face = next((f for e in cut["edges"] for f in e.link_faces if len(f.verts) > 4), None)
+        tried = mesh.copy()
+        bm.to_mesh(tried)
+        bm.free()
+        tried.update()
+        if _pinch_points(tried) >= before:  # it did not help: keep what we had
+            bpy.data.meshes.remove(tried)
+            break
+        # Relax the corners around each rebuilt pole along the surface, as _unfold does for pinched faces.
+        co = _coordinates(tried).astype(np.float64)
+        edges = _edges(tried)
+        count = np.bincount(edges.ravel(), minlength=len(co))
+        moving = np.array(sorted(i for i in ring if i < len(co)), dtype=np.int64)
+        for _ in range(rounds):
+            target = co[moving] + 0.5 * (_neighbour_mean(co, edges, count)[moving] - co[moving])
+            for k, point in zip(moving, target):
+                hit, _normal, _index, _distance = surface.find_nearest(Vector(point))
+                co[k] = hit if hit is not None else point
+        _set_coordinates(tried, co)
+        # Hand the rebuilt geometry back to the mesh the operator is working on.
+        bm = bmesh.new()
+        bm.from_mesh(tried)
+        bm.to_mesh(mesh)
+        bm.free()
+        mesh.update()
+        bpy.data.meshes.remove(tried)
+        rebuilt += len(chosen)
+    return rebuilt
+
+
 def _pinch_points(mesh):
     """Vertices where six or more edges meet: where QuadriFlow's grid could not close, which another seed
     usually moves away."""
@@ -365,6 +425,9 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
     preserve_sharp: BoolProperty(name="Preserve Sharp Edges", default=False, options={'SKIP_SAVE'},
                                  description="Keep sharp creases. Left unset, the Sculpt Kit panel's checkbox decides")
     smooth_normals: BoolProperty(name="Smooth Normals", default=True)
+    repair_pinches: BoolProperty(name="Rebuild Pinch Points", default=True,
+                                 description="Cut the faces around each vertex where six or more edges meet and "
+                                             "refill them with quads snapped to the sculpt")
     engine: EnumProperty(name="Engine", items=ENGINES, default='QUADRIFLOW', options={'SKIP_SAVE'},
                          description="Which remesher lays out the quads. Left unset, the Sculpt Kit panel decides")
 
@@ -390,7 +453,7 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
             original = ob.data
             surface = BVHTree.FromObject(ob, context.evaluated_depsgraph_get())  # the sculpt, to snap back onto
             closed = _open_edges(original) == 0
-            result, repairs, holes, unfolded, pinches = {'CANCELLED'}, {}, False, 0, 0
+            result, repairs, holes, unfolded, rebuilt, pinches = {'CANCELLED'}, {}, False, 0, 0, 0
             for attempt in range(2):  # a result with holes gets one more try with another seed
                 work = original.copy()
                 ob.data = work
@@ -419,6 +482,7 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
             if work is not None:
                 _project_and_relax(work, surface)
                 unfolded = _unfold(work, surface)
+                rebuilt = _repair_pinches(work, surface) if self.repair_pinches else 0
                 pinches = _pinch_points(work)
                 name = original.name
                 if original.users == 0:
@@ -433,6 +497,7 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
         self.report({'WARNING'} if holes or pinches else {'INFO'}, "Quad remeshed to {:,} faces".format(len(work.polygons))
                     + (". Repaired first: " + repaired if repaired else "")
                     + (". Evened out %d pinched faces" % unfolded if unfolded else "")
+                    + (". Rebuilt %d pinch point%s" % (rebuilt, "s" if rebuilt > 1 else "") if rebuilt else "")
                     + (". It has holes" if holes else "")
                     + (". %d pinch point%s" % (pinches, "s" if pinches > 1 else "") if pinches else "")
                     + (": try another Seed in the corner panel" if holes or pinches else ""))

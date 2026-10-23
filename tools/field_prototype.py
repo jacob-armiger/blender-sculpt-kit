@@ -47,6 +47,9 @@ def parse():
                    help="mirror plane the field is made square to; auto reads the mesh's X symmetry setting")
     p.add_argument("--hard", type=float, default=50.0, help="weight of a pinned vertex, against align times "
                                                               "confidence (at most align) on a free one")
+    p.add_argument("--pin-all", action="store_true",
+                   help="hand the engine the field at full weight everywhere, so it keeps it as is instead of "
+                        "re-solving around the confident vertices")
     p.add_argument("--engine", action="store_true",
                    help="also run the kit's engine on the proxy, free and steered by each field, project the "
                         "results onto the source and count pinch points (needs Sculpt Kit enabled in this "
@@ -441,7 +444,8 @@ def main():
     normals, mass, area = vertex_normals_and_areas(co, tris)
     smooth, steps = taubin(co, edges, args.target, area, args.smoothing)
     normals, mass, _ = vertex_normals_and_areas(smooth, tris)
-    print("FIELD proxy %d faces, %d vertices, smoothed %d steps, %.1fs" % (len(tris), len(co), steps, time.perf_counter() - started), flush=True)
+    print("FIELD proxy %d faces, %d vertices, Euler characteristic %d (index sum should be 4x that), smoothed %d steps, %.1fs"
+          % (len(tris), len(co), len(co) - len(edges) + len(tris), steps, time.perf_counter() - started), flush=True)
 
     started = time.perf_counter()
     quad = (area / args.target) ** 0.5
@@ -507,7 +511,8 @@ def main():
         save_field_object("field align %g" % align, smooth, directions, quad * 0.8)
         if instant_module is not None and instant_module.available():
             steered = run_engine("engine align %g" % align, proxy, source, args.target, remesh_module, instant_module,
-                                 directions.astype(np.float32), anisotropy.astype(np.float32),
+                                 directions.astype(np.float32),
+                                 np.ones(len(co), dtype=np.float32) if args.pin_all else anisotropy.astype(np.float32),
                                  is_capsule=args.shape == "capsule" and not bpy.data.filepath)
             print("FIELD engine align %g " % align + json.dumps(steered), flush=True)
             results.append({"engine": "align %g" % align, **steered})

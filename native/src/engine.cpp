@@ -62,7 +62,7 @@ struct Result {
 static Result run(const float *vertices_in, size_t n_vertices, const int32_t *faces_in, size_t n_faces,
                   int face_count, int rosy, int posy, float crease_angle, bool extrinsic,
                   bool align_to_boundaries, int smooth_iter, bool pure_quad, bool deterministic,
-                  const float *orientation, const float *orientation_weight) {
+                  const float *orientation, const float *orientation_weight, bool freeze_orientation) {
     auto started = std::chrono::steady_clock::now();
     Result out;
 
@@ -111,10 +111,27 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
     mRes.build(deterministic);
     mRes.resetSolution();
 
-    bool constrained = orientation != nullptr || align_to_boundaries;
+    /* Two ways to hand over a field. Frozen: it is written into Q at the finest level, restricted to the
+       coarser ones and never optimised, so the position solve and extraction see exactly the given field
+       (vertices without a direction keep a random one, so give every vertex one). Soft: it goes in as the
+       library's own constraints, which its smoother blends with at every level. */
+    bool frozen = orientation != nullptr && freeze_orientation;
+    if (frozen) {
+        size_t count = std::min<size_t>(n_vertices, mRes.V().cols());
+        for (size_t i = 0; i < count; ++i) {
+            Vector3f d(orientation[i * 3], orientation[i * 3 + 1], orientation[i * 3 + 2]);
+            Vector3f n = mRes.N().col(i);
+            d -= n * n.dot(d);
+            if (d.squaredNorm() > 1e-12f)
+                mRes.Q().col(i) = d.normalized();
+        }
+        mRes.propagateSolution(rosy);
+        mRes.setFrozenQ(true);
+    }
+    bool constrained = !frozen && (orientation != nullptr || align_to_boundaries);
     if (constrained)
         mRes.clearConstraints();
-    if (orientation != nullptr) {
+    if (orientation != nullptr && !frozen) {
         size_t count = std::min<size_t>(n_vertices, mRes.V().cols());
         for (size_t i = 0; i < count; ++i) {
             float w = orientation_weight ? orientation_weight[i] : 1.0f;
@@ -158,9 +175,11 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
     optimizer.setRoSy(rosy);
     optimizer.setPoSy(posy);
     optimizer.setExtrinsic(extrinsic);
-    optimizer.optimizeOrientations(-1);
-    optimizer.notify();
-    optimizer.wait();
+    if (!frozen) {  // optimizeOrientations(-1) would also unfreeze Q
+        optimizer.optimizeOrientations(-1);
+        optimizer.notify();
+        optimizer.wait();
+    }
     std::map<uint32_t, uint32_t> sing;
     compute_orientation_singularities(mRes, sing, extrinsic, rosy);
     out.singularities = (int) sing.size();
@@ -216,7 +235,7 @@ static Result run(const float *vertices_in, size_t n_vertices, const int32_t *fa
 static nb::dict remesh(Points vertices, Triangles faces, int target_faces, int rosy, int posy, float crease_angle,
                        bool extrinsic, bool align_to_boundaries, int smooth_iterations, bool pure_quad,
                        bool deterministic, std::optional<Points> orientation, std::optional<Weights> orientation_weight,
-                       bool quiet) {
+                       bool freeze_orientation, bool quiet) {
     if (faces.shape(0) == 0)
         throw std::runtime_error("the mesh has no faces");
     if (orientation && orientation->shape(0) != vertices.shape(0))
@@ -231,7 +250,7 @@ static nb::dict remesh(Points vertices, Triangles faces, int target_faces, int r
         out = run(vertices.data(), vertices.shape(0), faces.data(), faces.shape(0), face_count, rosy, posy,
                   crease_angle, extrinsic, align_to_boundaries, smooth_iterations, pure_quad, deterministic,
                   orientation ? orientation->data() : nullptr,
-                  orientation_weight ? orientation_weight->data() : nullptr);
+                  orientation_weight ? orientation_weight->data() : nullptr, freeze_orientation);
     }
     nb::dict result;
     size_t n = out.vertices.size() / 3;
@@ -250,7 +269,8 @@ NB_MODULE(_engine, m) {
           nb::arg("rosy") = 4, nb::arg("posy") = 4, nb::arg("crease_angle") = -1.0f, nb::arg("extrinsic") = false,
           nb::arg("align_to_boundaries") = false, nb::arg("smooth_iterations") = 2, nb::arg("pure_quad") = true,
           nb::arg("deterministic") = true, nb::arg("orientation").none() = nb::none(),
-          nb::arg("orientation_weight").none() = nb::none(), nb::arg("quiet") = true,
+          nb::arg("orientation_weight").none() = nb::none(), nb::arg("freeze_orientation") = false,
+          nb::arg("quiet") = true,
           "Remesh triangles (n x 3 float32 vertices, m x 3 int32 faces) into quads. Returns a dict with "
           "vertices, corners (flat), sizes (per face), singularities and seconds.");
 }

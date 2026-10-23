@@ -48,8 +48,8 @@ def parse():
     p.add_argument("--hard", type=float, default=50.0, help="weight of a pinned vertex, against align times "
                                                               "confidence (at most align) on a free one")
     p.add_argument("--pin-all", action="store_true",
-                   help="hand the engine the field at full weight everywhere, so it keeps it as is instead of "
-                        "re-solving around the confident vertices")
+                   help="freeze the engine's orientation field to ours (written in, never optimised) instead of "
+                        "handing it over as soft constraints weighted by confidence")
     p.add_argument("--engine", action="store_true",
                    help="also run the kit's engine on the proxy, free and steered by each field, project the "
                         "results onto the source and count pinch points (needs Sculpt Kit enabled in this "
@@ -394,13 +394,20 @@ def quad_axis_alignment(mesh, remesh):
     return float(np.cos(4 * angle)[band].mean()) if band.any() else None
 
 
-def run_engine(name, proxy, source, target, remesh, instant, directions=None, confidence=None, is_capsule=False):
-    """The kit's engine on a copy of the proxy, steered by the field when given, projected onto the source."""
+def run_engine(name, proxy, source, target, remesh, instant, directions=None, confidence=None, is_capsule=False,
+               freeze=False, positions=None):
+    """The kit's engine on a copy of the proxy (at the smoothed positions the field was computed on, when
+    given, so the engine's tangent planes are the field's), steered by the field when given, projected onto
+    the source."""
     from mathutils.bvhtree import BVHTree
     started = time.perf_counter()
     mesh = proxy.data.copy()
     mesh.name = name
-    stats = instant.remesh(mesh, target, pure_quad=True, orientation=directions, orientation_weight=confidence)
+    if positions is not None:
+        mesh.attributes["position"].data.foreach_set("vector", np.ascontiguousarray(positions, dtype=np.float32).ravel())
+        mesh.update()
+    stats = instant.remesh(mesh, target, pure_quad=True, orientation=directions, orientation_weight=confidence,
+                           freeze_orientation=freeze)
     surface = BVHTree.FromObject(source, bpy.context.evaluated_depsgraph_get())
     remesh._project_and_relax(mesh, surface)
     unfolded = remesh._unfold(mesh, surface)
@@ -481,7 +488,8 @@ def main():
             instant_module = None
         else:
             is_capsule = args.shape == "capsule" and not bpy.data.filepath
-            row = run_engine("engine free", proxy, source, args.target, remesh_module, instant_module, is_capsule=is_capsule)
+            row = run_engine("engine free", proxy, source, args.target, remesh_module, instant_module, is_capsule=is_capsule,
+                             positions=smooth)
             print("FIELD engine free " + json.dumps(row), flush=True)
             results.append({"engine": "free", **row})
     for align in (float(a) for a in args.align.split(",")):
@@ -513,6 +521,7 @@ def main():
             steered = run_engine("engine align %g" % align, proxy, source, args.target, remesh_module, instant_module,
                                  directions.astype(np.float32),
                                  np.ones(len(co), dtype=np.float32) if args.pin_all else anisotropy.astype(np.float32),
+                                 freeze=args.pin_all, positions=smooth,
                                  is_capsule=args.shape == "capsule" and not bpy.data.filepath)
             print("FIELD engine align %g " % align + json.dumps(steered), flush=True)
             results.append({"engine": "align %g" % align, **steered})

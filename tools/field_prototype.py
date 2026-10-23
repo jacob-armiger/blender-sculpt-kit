@@ -546,41 +546,54 @@ def trivial_connection(z_index_target, tris, edges, edge_of_side, r1, euler, ite
         hol = (ss * base[es]).sum()
         target = np.round(hol / (np.pi / 2)) * (np.pi / 2)  # a cross field only needs a quarter turn
         cycles.append((es, ss, target - hol))
-    b = np.concatenate([b_faces, np.array([c[2] for c in cycles])])
+    # Faces first: the face rows alone give the dual graph's Laplacian, which conjugate gradient solves fast;
+    # the few generator rows (long cycles, badly conditioned together with the faces) are added after as a
+    # correction inside the face rows' null space, through a small dense system.
+    def A_f(x):
+        return (sign * x[edge_of_side]).sum(axis=1)
 
-    def A(x):
-        out = np.empty(len(tris) + len(cycles))
-        out[:len(tris)] = (sign * x[edge_of_side]).sum(axis=1)
-        for i, (es, ss, _) in enumerate(cycles):
-            out[len(tris) + i] = (ss * x[es]).sum()
-        return out
-
-    def At(y):
+    def At_f(y):
         x = np.zeros(n_e)
         for side in range(3):
-            x += np.bincount(edge_of_side[:, side], weights=sign[:, side] * y[:len(tris)], minlength=n_e)
-        for i, (es, ss, _) in enumerate(cycles):
-            np.add.at(x, es, ss * y[len(tris) + i])
+            x += np.bincount(edge_of_side[:, side], weights=sign[:, side] * y, minlength=n_e)
         return x
 
-    y = np.zeros(len(b))
-    rr_vec = b - A(At(y))
-    p = rr_vec.copy()
-    rr = rr_vec @ rr_vec
-    b_norm = max(np.sqrt(b @ b), 1e-30)
-    steps = 0
-    for steps in range(1, iterations + 1):
-        ap = A(At(p))
-        alpha = rr / max(p @ ap, 1e-300)
-        y += alpha * p
-        rr_vec -= alpha * ap
-        rr_new = rr_vec @ rr_vec
-        if np.sqrt(rr_new) < 1e-8 * b_norm:
-            break
-        p = rr_vec + (rr_new / rr) * p
-        rr = rr_new
-    x = At(y)
-    return x, parent, parent_edge, order, len(cycles), steps, float(np.sqrt(rr_new) / b_norm)
+    def least_norm_faces(rhs):
+        """x of least norm with A_f x = rhs: x = A_f^T y, (A_f A_f^T) y = rhs, by conjugate gradient."""
+        y = np.zeros(len(rhs))
+        res = rhs - A_f(At_f(y))
+        p = res.copy()
+        rr = res @ res
+        norm = max(np.sqrt(rhs @ rhs), 1e-30)
+        for k in range(1, iterations + 1):
+            ap = A_f(At_f(p))
+            alpha = rr / max(p @ ap, 1e-300)
+            y += alpha * p
+            res -= alpha * ap
+            rr_new = res @ res
+            if np.sqrt(rr_new) < 1e-9 * norm:
+                break
+            p = res + (rr_new / rr) * p
+            rr = rr_new
+        return At_f(y), k, float(np.sqrt(rr_new) / norm)
+
+    x, steps, residual = least_norm_faces(b_faces)
+    if cycles:
+        # each generator row g, projected onto the null space of A_f: p = g - A_f^T (A_f A_f^T)^+ A_f g
+        rows, projected = [], []
+        for es, ss, _ in cycles:
+            g = np.zeros(n_e)
+            np.add.at(g, es, ss)
+            rows.append(g)
+            fix, _, _ = least_norm_faces(A_f(g))
+            projected.append(g - fix)
+        rows, projected = np.array(rows), np.array(projected)
+        want = np.array([c[2] for c in cycles]) - rows @ x
+        gram = projected @ projected.T
+        coefficients = np.linalg.lstsq(gram, want, rcond=None)[0]
+        x = x + coefficients @ projected
+        residual = max(residual, float(np.abs(rows @ x - np.array([c[2] for c in cycles])).max()))
+    return x, parent, parent_edge, order, len(cycles), steps, residual
 
 
 def walk_field(x, parent, parent_edge, order, edges, r1):

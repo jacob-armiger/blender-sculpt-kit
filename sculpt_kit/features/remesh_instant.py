@@ -1,10 +1,12 @@
 """Instant Meshes as a second engine for Repairing Remesh (the Option B experiment).
 
-Instant Meshes (Jakob et al. 2015, BSD-3) comes as the pyinstantmeshes wheel, bundled in ../wheels and listed
-in the manifest. Its remesh() function is not used: it writes the mesh to a temporary OBJ, runs the remesher,
-and reads the result back through a loader that splits every quad into two triangles, so the quads never
-reach Python. remesh_file() leaves the output OBJ for us to parse, which keeps the quads, and its own read-back
-of that file (which raises on faces with more than four sides) is caught and ignored.
+Instant Meshes (Jakob et al. 2015, BSD-3) is reached two ways, both bundled in ../wheels and listed in the
+manifest. First choice is the kit's own binding, sculpt_kit_remesh (built from native/): arrays in, polygons
+out, and an orientation hook for a field computed elsewhere. Where that wheel is not built yet the PyPI
+pyinstantmeshes wheel is used. Its remesh() function is not: it writes the mesh to a temporary OBJ, runs the
+remesher, and reads the result back through a loader that splits every quad into two triangles, so the quads
+never reach Python. remesh_file() leaves the output OBJ for us to parse, which keeps the quads, and its own
+read-back of that file (which raises on faces with more than four sides) is caught and ignored.
 
 Two things the engine does differently from QuadriFlow:
   - pure quads come from subdividing every face of its quad-dominant result into four, so it is asked for a
@@ -18,13 +20,21 @@ import time
 import numpy as np
 
 try:
-    import pyinstantmeshes
-except ImportError:  # the wheel is not installed for this platform
+    import sculpt_kit_remesh  # our own binding (native/): in memory, polygons out, orientation hook
+except ImportError:
+    sculpt_kit_remesh = None
+try:
+    import pyinstantmeshes  # the PyPI wheel: the fallback where our own is not built yet
+except ImportError:
     pyinstantmeshes = None
 
 
 def available():
-    return pyinstantmeshes is not None
+    return sculpt_kit_remesh is not None or pyinstantmeshes is not None
+
+
+def engine_name():
+    return "native" if sculpt_kit_remesh is not None else "pyinstantmeshes" if pyinstantmeshes is not None else None
 
 
 def _triangles(mesh):
@@ -96,20 +106,44 @@ def _fill_holes(mesh):
 
 
 def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=True, smooth_iterations=2,
-           fill_holes=True):
+           fill_holes=True, orientation=None, orientation_weight=None):
     """Rebuild the mesh with Instant Meshes. Returns timings and counts; raises RuntimeError when it fails.
-    fill_holes closes the gaps it leaves: pass False for a mesh that is meant to have open edges."""
-    if pyinstantmeshes is None:
+    fill_holes closes the gaps it leaves: pass False for a mesh that is meant to have open edges.
+    orientation (one direction per vertex) and orientation_weight (0 to 1 each) steer the layout; they need
+    our own engine."""
+    if not available():
         raise RuntimeError("Instant Meshes is not installed for this platform")
     co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
     mesh.attributes["position"].data.foreach_get("vector", co)
     tris = _triangles(mesh)
     if not len(tris):
         raise RuntimeError("the mesh has no faces")
-    stats = {}
+    stats = {"engine": engine_name()}
+    started = time.perf_counter()
+    if sculpt_kit_remesh is not None:
+        out = sculpt_kit_remesh.remesh(
+            co.reshape(-1, 3), tris, target_faces=target_faces, pure_quad=pure_quad, crease_angle=crease_angle,
+            deterministic=deterministic, smooth_iterations=smooth_iterations,
+            orientation=None if orientation is None else np.ascontiguousarray(orientation, dtype=np.float32),
+            orientation_weight=None if orientation_weight is None else np.ascontiguousarray(orientation_weight, dtype=np.float32))
+        stats["remesh"] = time.perf_counter() - started
+        stats["singularities"] = out["singularities"]
+        started = time.perf_counter()
+        sizes, corners = out["sizes"], out["corners"]
+        starts = np.concatenate([[0], np.cumsum(sizes)[:-1]])
+        faces = {int(n): corners[starts[sizes == n][:, None] + np.arange(n)] for n in np.unique(sizes)}
+        if not faces:
+            raise RuntimeError("Instant Meshes gave no faces")
+        _replace_geometry(mesh, out["vertices"], faces)
+        if fill_holes:
+            stats["open edges filled"] = _fill_holes(mesh)
+        stats["rebuild"] = time.perf_counter() - started
+        stats["sides"] = {n: len(fs) for n, fs in sorted(faces.items())}
+        return stats
+    if orientation is not None:
+        raise RuntimeError("steering the layout needs the kit's own engine, which is not built for this platform")
     with tempfile.TemporaryDirectory(prefix="sculptkit_im_") as folder:
         src, dst = os.path.join(folder, "in.obj"), os.path.join(folder, "out.obj")
-        started = time.perf_counter()
         _write_obj(src, co.reshape(-1, 3), tris)
         stats["write"] = time.perf_counter() - started
         started = time.perf_counter()

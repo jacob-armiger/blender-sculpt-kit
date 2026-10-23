@@ -27,14 +27,18 @@ FetchContent_Declare(instant_meshes
   GIT_REPOSITORY https://github.com/wjakob/instant-meshes.git
   GIT_TAG        7b3160864a2e1025af498c84cfed91cbfb613698
   GIT_SUBMODULES "ext/tbb" "ext/dset" "ext/pss" "ext/pcg32"
-  GIT_SHALLOW    OFF)
+  GIT_SHALLOW    OFF
+  # Our changes to the library live in patches/ (see each file's header); applied once, after the clone.
+  PATCH_COMMAND  git apply --ignore-whitespace ${CMAKE_CURRENT_SOURCE_DIR}/patches/0001-cap-extraction-step5.patch
+  UPDATE_DISCONNECTED ON
+  SOURCE_SUBDIR  cmake-not-used)   # its own CMakeLists builds the viewer and wants nanogui: never entered
 # Eigen 3.4 (MPL-2, header-only). Instant Meshes expects the copy inside nanogui, which is not fetched.
 FetchContent_Declare(eigen
   URL      https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
   URL_HASH SHA256=8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72
-  DOWNLOAD_EXTRACT_TIMESTAMP ON)
-FetchContent_MakeAvailable(instant_meshes)
-FetchContent_Populate(eigen)
+  DOWNLOAD_EXTRACT_TIMESTAMP ON
+  SOURCE_SUBDIR  cmake-not-used)
+FetchContent_MakeAvailable(instant_meshes eigen)
 
 # ---------------------------------------------------------------------- TBB (the old fork Instant Meshes pins)
 set(TBB_BUILD_STATIC ON CACHE BOOL "" FORCE)
@@ -64,6 +68,10 @@ target_include_directories(_engine PRIVATE
   ${instant_meshes_SOURCE_DIR}/ext/pss ${instant_meshes_SOURCE_DIR}/ext/pcg32
   ${instant_meshes_SOURCE_DIR}/ext/rply ${instant_meshes_SOURCE_DIR}/ext/half)
 target_link_libraries(_engine PRIVATE tbb_static)
+# nanobind compiles the module as C++17; the 2017 TBB headers still use std::binary_function, removed in
+# C++17 by libc++ (Apple) and MSVC unless these switches bring it back. GCC's libstdc++ only warns.
+target_compile_definitions(_engine PRIVATE
+  _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION _HAS_AUTO_PTR_ETC=1 _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
 if (NOT MSVC)
   target_compile_options(_engine PRIVATE -Wno-deprecated-declarations -Wno-unused-result)
 endif()

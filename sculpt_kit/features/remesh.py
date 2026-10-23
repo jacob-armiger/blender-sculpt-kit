@@ -398,7 +398,8 @@ copy so the result follows the forms, then snaps it back onto the sculpt"""
                 scale, repairs = prepare_for_quadriflow(work)
                 try:
                     if self.engine == 'INSTANT':
-                        remesh_instant.remesh(work, target, pure_quad=True, crease_angle=50.0 if sharp else -1.0)
+                        remesh_instant.remesh(work, target, pure_quad=True, crease_angle=50.0 if sharp else -1.0,
+                                              fill_holes=closed)
                         result = {'FINISHED'}
                     else:
                         result = bpy.ops.object.quadriflow_remesh(

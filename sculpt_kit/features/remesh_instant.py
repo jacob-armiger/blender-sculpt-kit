@@ -77,8 +77,28 @@ def _replace_geometry(mesh, co, faces):
     mesh.validate()
 
 
-def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=True, smooth_iterations=2):
-    """Rebuild the mesh with Instant Meshes. Returns timings and counts; raises RuntimeError when it fails."""
+def _fill_holes(mesh):
+    """Close the small gaps Instant Meshes leaves where its grid did not meet (36 to 272 open edges on a
+    sphere in the measurements), with quads where four sides allow it. Returns how many edges were open."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    open_edges = [e for e in bm.edges if e.is_boundary]
+    if open_edges:
+        bmesh.ops.holes_fill(bm, edges=open_edges, sides=4)
+        still = [e for e in bm.edges if e.is_boundary]
+        if still:
+            bmesh.ops.holes_fill(bm, edges=still, sides=0)
+        bm.to_mesh(mesh)
+        mesh.update()
+    bm.free()
+    return len(open_edges)
+
+
+def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=True, smooth_iterations=2,
+           fill_holes=True):
+    """Rebuild the mesh with Instant Meshes. Returns timings and counts; raises RuntimeError when it fails.
+    fill_holes closes the gaps it leaves: pass False for a mesh that is meant to have open edges."""
     if pyinstantmeshes is None:
         raise RuntimeError("Instant Meshes is not installed for this platform")
     co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
@@ -107,6 +127,8 @@ def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=
         if not faces:
             raise RuntimeError("Instant Meshes gave no faces")
     _replace_geometry(mesh, out_co, faces)
+    if fill_holes:
+        stats["open edges filled"] = _fill_holes(mesh)
     stats["rebuild"] = time.perf_counter() - started
     stats["sides"] = {n: len(fs) for n, fs in sorted(faces.items())}
     return stats

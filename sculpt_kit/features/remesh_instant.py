@@ -121,12 +121,16 @@ def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=
     stats = {"engine": engine_name()}
     started = time.perf_counter()
     if sculpt_kit_remesh is not None:
+        steering = {}
+        if orientation is not None:
+            steering["orientation"] = np.ascontiguousarray(orientation, dtype=np.float32)
+            if orientation_weight is not None:
+                steering["orientation_weight"] = np.ascontiguousarray(orientation_weight, dtype=np.float32)
+            if freeze_orientation:  # wheels built before the freeze hook do not know the argument
+                steering["freeze_orientation"] = True
         out = sculpt_kit_remesh.remesh(
             co.reshape(-1, 3), tris, target_faces=target_faces, pure_quad=pure_quad, crease_angle=crease_angle,
-            deterministic=deterministic, smooth_iterations=smooth_iterations,
-            orientation=None if orientation is None else np.ascontiguousarray(orientation, dtype=np.float32),
-            orientation_weight=None if orientation_weight is None else np.ascontiguousarray(orientation_weight, dtype=np.float32),
-            freeze_orientation=freeze_orientation)
+            deterministic=deterministic, smooth_iterations=smooth_iterations, **steering)
         stats["remesh"] = time.perf_counter() - started
         stats["singularities"] = out["singularities"]
         started = time.perf_counter()

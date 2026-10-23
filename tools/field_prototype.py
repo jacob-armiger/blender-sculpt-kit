@@ -345,6 +345,14 @@ def main():
         row = {"align": align, "seconds": round(time.perf_counter() - started, 2), "cg_steps": steps,
                "singularities": singular, "index_sum": int(index.sum()),
                "index_counts": {int(k): int(c) for k, c in zip(*np.unique(index, return_counts=True))}}
+        if args.shape == "capsule" and not bpy.data.filepath:
+            # How well the field follows the capsule's axis in its middle band: cos of 4 times the angle
+            # between the field and the axis projected onto the tangent plane, 1 when aligned, -1 at 45 degrees.
+            band = np.abs(smooth[:, 2]) < 0.8
+            axis = np.repeat(np.float64([[0.0, 0.0, 1.0]]), len(smooth), axis=0)
+            axis -= (axis * normals).sum(1)[:, None] * normals
+            axis_angle = local_angle(axis, tx, ty)
+            row["axis_alignment"] = float(np.cos(4 * (np.angle(z) / 4.0 - axis_angle))[band].mean())
         results.append(row)
         print("FIELD " + json.dumps(row), flush=True)
         directions = field_vectors(np.angle(z) / 4.0, tx, ty)

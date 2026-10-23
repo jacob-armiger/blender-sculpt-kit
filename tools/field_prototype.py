@@ -48,6 +48,10 @@ def parse():
     p.add_argument("--hard", type=float, default=50.0, help="weight of a pinned vertex, against align times "
                                                               "confidence (at most align) on a free one")
     p.add_argument("--cg-iterations", type=int, default=400, help="conjugate gradient cap for the aligned solve")
+    p.add_argument("--prune", type=float, default=0.0,
+                   help="cancel +1/-1 singularity pairs closer than this many quads by pinning the patch between "
+                        "them to one direction and solving again; 0 disables")
+    p.add_argument("--prune-rounds", type=int, default=2)
     p.add_argument("--pin-all", action="store_true",
                    help="freeze the engine's orientation field to ours (written in, never optimised) instead of "
                         "handing it over as soft constraints weighted by confidence")
@@ -360,6 +364,54 @@ def face_indices(z, tris, edge_of_side, edges, r, r1, n_sym=4):
 
 # ------------------------------------------------------------------------------------------------ output
 
+def pair_pins(z, index, tris, co, normals, tx, ty, quad, reach):
+    """Singularities of opposite sign closer than `reach` quads are asked to cancel: the patch around each
+    pair is pinned to one parallel direction (the cross at the vertex nearest the pair, carried as a 3D vector
+    and projected into each vertex's tangent plane). Returns the pin field, its mask and the pair count."""
+    n = len(co)
+    d = np.zeros(n, dtype=np.complex128)
+    mask = np.zeros(n, dtype=bool)
+    plus, minus = np.flatnonzero(index > 0), np.flatnonzero(index < 0)
+    if not len(plus) or not len(minus):
+        return d, mask, 0
+    centres = co[tris].mean(axis=1)
+    gaps = np.linalg.norm(centres[plus][:, None, :] - centres[minus][None, :, :], axis=2)
+    order = np.argsort(gaps, axis=None)
+    used_plus, used_minus, pairs = set(), set(), []
+    for flat in order:
+        i, j = divmod(int(flat), len(minus))
+        if gaps[i, j] > reach * quad:
+            break
+        if i in used_plus or j in used_minus:
+            continue
+        used_plus.add(i)
+        used_minus.add(j)
+        pairs.append((centres[plus[i]], centres[minus[j]], gaps[i, j]))
+    theta = np.angle(z) / 4.0
+    u = field_vectors(theta, tx, ty)
+    for a, b, gap in pairs:
+        middle = 0.5 * (a + b)
+        near = np.linalg.norm(co - middle, axis=1) < 0.5 * gap + 1.5 * quad
+        if not near.any():
+            continue
+        seed = np.argmin(np.linalg.norm(co - middle, axis=1))
+        reference = u[seed]
+        # Every cross has four members in its tangent plane; take each vertex's member nearest the reference,
+        # average, and pin the patch to that one direction.
+        members = []
+        for k in np.flatnonzero(near):
+            cross = [u[k], -u[k], np.cross(normals[k], u[k]), -np.cross(normals[k], u[k])]
+            members.append(max(cross, key=lambda v: float(v @ reference)))
+        mean = np.mean(members, axis=0)
+        for k in np.flatnonzero(near):
+            t = mean - normals[k] * (normals[k] @ mean)
+            if np.linalg.norm(t) < 1e-9:
+                continue
+            d[k] = np.exp(4j * local_angle(t[None, :], tx[k:k + 1], ty[k:k + 1])[0])
+            mask[k] = True
+    return d, mask, len(pairs)
+
+
 def field_vectors(theta, tx, ty, n_sym=4):
     """The angle of a 4-fold field value (as a complex number's argument) back to a 3D tangent direction."""
     return np.cos(theta)[:, None] * tx + np.sin(theta)[:, None] * ty
@@ -506,6 +558,20 @@ def main():
         row = {"align": align, "seconds": round(time.perf_counter() - started, 2), "cg_steps": steps,
                "singularities": singular, "index_sum": int(index.sum()),
                "index_counts": {int(k): int(c) for k, c in zip(*np.unique(index, return_counts=True))}}
+        if args.prune > 0.0 and align > 0.0:
+            # Pair pruning: pin the patch around each close +1/-1 pair to one direction and solve again.
+            pruned = []
+            for _ in range(args.prune_rounds):
+                pin_d, pin_mask, pair_count = pair_pins(z, index, tris, smooth, normals, tx, ty, quad, args.prune)
+                if not pair_count:
+                    break
+                d2, weight2 = d.copy(), weight.copy()
+                d2[pin_mask], weight2[pin_mask] = pin_d[pin_mask], args.hard
+                z, steps = aligned_field(edges, weights, r, mass, d2, weight2, z, args.cg_iterations)
+                index = face_indices(z, tris, edge_of_side, edges, r, r1)
+                pruned.append({"pairs": pair_count, "pinned": int(pin_mask.sum()), "singularities": int((index != 0).sum())})
+            row["pruning"] = pruned
+            row["singularities_after_pruning"] = int((index != 0).sum())
         if args.shape == "capsule" and not bpy.data.filepath:
             # How well the field follows the capsule's axis in its middle band: cos of 4 times the angle
             # between the field and the axis projected onto the tangent plane, 1 when aligned, -1 at 45 degrees.

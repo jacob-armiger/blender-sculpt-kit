@@ -35,10 +35,18 @@ def parse():
     p.add_argument("--object", default="")
     p.add_argument("--target", type=int, default=20000)
     p.add_argument("--proxy", type=int, default=100000)
+    p.add_argument("--proxy-method", default="decimate", choices=("decimate", "voxel"),
+                   help="how the proxy is made: Decimate (collapse) or a Voxel Remesh at the matching size")
     p.add_argument("--align", default="0,1,10")
     p.add_argument("--smoothing", type=float, default=1.0)
     p.add_argument("--out", default="tests/out/field")
     p.add_argument("--sphere-faces", type=int, default=1_300_000)
+    p.add_argument("--sharp-angle", type=float, default=60.0,
+                   help="edges folding by more than this many degrees pin the field to their direction; 0 disables")
+    p.add_argument("--symmetry", default="auto", choices=("auto", "none", "x", "y", "z"),
+                   help="mirror plane the field is made square to; auto reads the mesh's X symmetry setting")
+    p.add_argument("--hard", type=float, default=50.0, help="weight of a pinned vertex, against align times "
+                                                              "confidence (at most align) on a free one")
     p.add_argument("--engine", action="store_true",
                    help="also run the kit's engine on the proxy, free and steered by each field, project the "
                         "results onto the source and count pinch points (needs Sculpt Kit enabled in this "
@@ -85,12 +93,21 @@ def noisy_shape(faces, shape):
     return ob
 
 
-def proxy_of(ob, faces):
-    """A decimated copy of the object as a new mesh object."""
+def proxy_of(ob, faces, method="decimate"):
+    """A coarser copy of the object as a new mesh object: decimated (collapse, keeps the shape, makes slivers),
+    or voxel remeshed (even faces, rounds off detail finer than the voxel, which is what the field wants)."""
     copy = ob.copy()
     copy.data = ob.data.copy()
     copy.name = "proxy"
     bpy.context.scene.collection.objects.link(copy)
+    if method == "voxel":
+        area = np.empty(len(copy.data.polygons), dtype=np.float32)
+        copy.data.polygons.foreach_get("area", area)
+        copy.data.remesh_voxel_size = (1.4 * float(area.sum()) / faces) ** 0.5  # the kit's FACES_PER_VOXEL_AREA
+        copy.data.use_remesh_preserve_attributes = False
+        with bpy.context.temp_override(object=copy, active_object=copy, selected_objects=[copy]):
+            bpy.ops.object.voxel_remesh()
+        return copy
     ratio = min(1.0, faces / max(1, len(copy.data.polygons)))
     if ratio < 1.0:
         mod = copy.modifiers.new("decimate", 'DECIMATE')
@@ -213,11 +230,15 @@ def confidence_of(k1, k2, quad):
 
 
 def connection(co, edges, tx, ty, n_sym=4):
-    """Transport along each edge i->j as a unit complex number raised to n_sym, for a field with that symmetry."""
+    """Transport along each edge i->j as a unit complex number raised to n_sym, for a field with that symmetry,
+    and the plain (1-fold) transport, which the index count needs unwrapped."""
     v = co[edges[:, 1]] - co[edges[:, 0]]
     at_i = local_angle(v, tx[edges[:, 0]], ty[edges[:, 0]])
     at_j = local_angle(-v, tx[edges[:, 1]], ty[edges[:, 1]])
-    return np.exp(1j * n_sym * (at_j - at_i))
+    # The edge leaves i at angle at_i and arrives at j pointing the opposite way, at_j + pi: the plain transport
+    # carries that half turn. The 4-fold one does not notice it (exp(4 i pi) = 1), so it is the same either way.
+    r1 = np.exp(1j * (at_j - at_i + np.pi))
+    return r1 ** n_sym, r1
 
 
 def laplacian_apply(z, edges, weights, r):
@@ -262,17 +283,63 @@ def smoothest_field(edges, weights, r, mass, rounds=20):
     return z
 
 
-def aligned_field(edges, weights, r, mass, d, confidence, align, start):
-    """Minimizes the Dirichlet energy plus align * sum m_i c_i |z_i - d_i|^2."""
-    diag = align * mass * confidence
+def aligned_field(edges, weights, r, mass, d, weight, start):
+    """Minimizes the Dirichlet energy plus sum m_i w_i |z_i - d_i|^2: w is align times the curvature confidence
+    on free vertices, and the hard weight on constrained ones (sharp edges, the symmetry plane)."""
+    diag = mass * weight
     z, steps = conjugate_gradient(lambda x: laplacian_apply(x, edges, weights, r) + diag * x + 1e-6 * mass * x,
                                   diag * d, start)
     return z, steps
 
 
-def face_indices(z, tris, edge_of_side, edges, r, n_sym=4):
+def sharp_constraints(co, tris, edges, edge_of_side, tx, ty, angle_degrees):
+    """Vertices on edges where the surface folds by more than the angle, each asked to align with that edge
+    (a vertex on several sharp edges takes the last one; corners of three are rare on a sculpt). Measured on
+    the unsmoothed proxy, since smoothing is what removes creases. Returns the direction field and a mask."""
+    n = len(co)
+    pinned = np.zeros(n, dtype=bool)
+    d = np.zeros(n, dtype=np.complex128)
+    if angle_degrees <= 0.0:
+        return d, pinned
+    a, b, c = co[tris[:, 0]], co[tris[:, 1]], co[tris[:, 2]]
+    face_normals = np.cross(b - a, c - a)
+    face_normals /= np.maximum(np.linalg.norm(face_normals, axis=1), 1e-20)[:, None]
+    # the two faces of each edge: every manifold edge appears exactly twice among the triangle sides
+    order = np.argsort(edge_of_side.ravel(), kind="stable")
+    edge_ids = edge_of_side.ravel()[order]
+    tri_ids = np.repeat(np.arange(len(tris)), 3)[order]
+    first = np.flatnonzero(np.r_[True, edge_ids[1:] != edge_ids[:-1]])
+    counts = np.diff(np.r_[first, len(edge_ids)])
+    two = first[counts == 2]
+    cos_fold = (face_normals[tri_ids[two]] * face_normals[tri_ids[two + 1]]).sum(1)
+    sharp = edge_ids[two][cos_fold < np.cos(np.radians(angle_degrees))]
+    for end in (0, 1):
+        v = edges[sharp, end]
+        direction = co[edges[sharp, 1 - end]] - co[v]
+        d[v] = np.exp(4j * local_angle(direction, tx[v], ty[v]))
+        pinned[v] = True
+    return d, pinned
+
+
+def symmetry_constraints(co, normals, tx, ty, quad, axis=0):
+    """Vertices within one quad of the mirror plane, asked to align with the plane's normal (so quads meet the
+    seam square-on and a mirrored half welds to a clean loop). Returns the direction field and a mask."""
+    n = len(co)
+    pinned = np.abs(co[:, axis]) < quad
+    d = np.zeros(n, dtype=np.complex128)
+    plane_normal = np.zeros((n, 3))
+    plane_normal[:, axis] = 1.0
+    plane_normal -= (plane_normal * normals).sum(1)[:, None] * normals  # into the tangent plane
+    usable = pinned & (np.linalg.norm(plane_normal, axis=1) > 1e-6)
+    d[usable] = np.exp(4j * local_angle(plane_normal[usable], tx[usable], ty[usable]))
+    return d, usable
+
+
+def face_indices(z, tris, edge_of_side, edges, r, r1, n_sym=4):
     """The index of each face: the field's rotation around it (in units of 2 pi of the n-fold field) plus the
-    connection's own holonomy, so a parallel field on a sphere still sums to n_sym times its Euler number."""
+    connection's own holonomy, so a parallel field on a sphere still sums to n_sym times its Euler number.
+    The holonomy is taken from the 1-fold transport and multiplied by n_sym: taken from the n-fold one it would
+    wrap whenever a face turns by more than 180 / n_sym degrees, which slivers on a decimated proxy do."""
     unit = z / np.maximum(np.abs(z), 1e-20)
     total = np.zeros(len(tris))
     holonomy = np.ones(len(tris), dtype=np.complex128)
@@ -282,8 +349,8 @@ def face_indices(z, tris, edge_of_side, edges, r, n_sym=4):
         forward = edges[e, 0] == a
         transport = np.where(forward, r[e], np.conj(r[e]))
         total += np.angle(unit[b] * np.conj(transport * unit[a]))
-        holonomy *= transport
-    total += np.angle(holonomy)
+        holonomy *= np.where(forward, r1[e], np.conj(r1[e]))
+    total += n_sym * np.angle(holonomy)
     return np.rint(total / (2 * np.pi)).astype(int)
 
 
@@ -364,10 +431,11 @@ def main():
         source = next(o for o in bpy.context.scene.objects if o.type == 'MESH')
     else:
         source = noisy_shape(args.sphere_faces, args.shape)
+    source.modifiers.clear()  # the field is for the mesh itself, not a subdivided or decimated view of it
     print("FIELD source %s: %d faces" % (source.name, len(source.data.polygons)), flush=True)
 
     started = time.perf_counter()
-    proxy = proxy_of(source, args.proxy)
+    proxy = proxy_of(source, args.proxy, args.proxy_method)
     co, tris = coordinates(proxy.data), triangles(proxy.data)
     edges, edge_of_side = unique_edges(tris)
     normals, mass, area = vertex_normals_and_areas(co, tris)
@@ -381,10 +449,23 @@ def main():
     theta, k1, k2 = principal_directions(smooth, normals, edges, tx, ty)
     anisotropy = confidence_of(k1, k2, quad)
     weights = cotan_weights(smooth, tris, edge_of_side)
-    r = connection(smooth, edges, tx, ty)
+    r, r1 = connection(smooth, edges, tx, ty)
     d = np.exp(4j * theta)
     print("FIELD setup %.1fs; confidence median %.2f, mean %.2f, share above 0.5: %.2f"
           % (time.perf_counter() - started, np.median(anisotropy), anisotropy.mean(), (anisotropy > 0.5).mean()), flush=True)
+
+    # Constraints: the field is told where to go on sharp edges and along the symmetry plane, hard.
+    pinned = np.zeros(len(co), dtype=bool)
+    sharp_d, sharp_mask = sharp_constraints(co, tris, edges, edge_of_side, tx, ty, args.sharp_angle)
+    d[sharp_mask], pinned[sharp_mask] = sharp_d[sharp_mask], True
+    symmetry = args.symmetry
+    if symmetry == "auto":
+        symmetry = "x" if source.data.use_mirror_x else "none"
+    if symmetry != "none":
+        mirror_d, mirror_mask = symmetry_constraints(smooth, normals, tx, ty, quad, "xyz".index(symmetry))
+        d[mirror_mask], pinned[mirror_mask] = mirror_d[mirror_mask], True
+    print("FIELD constraints: %d vertices on sharp edges (over %g degrees), %d on the symmetry plane (%s), hard weight %g"
+          % (int(sharp_mask.sum()), args.sharp_angle, int(pinned.sum() - sharp_mask.sum()), symmetry, args.hard), flush=True)
 
     results = []
     z = None
@@ -404,8 +485,10 @@ def main():
         if align <= 0.0:
             z, steps = smoothest_field(edges, weights, r, mass), 0
         else:
-            z, steps = aligned_field(edges, weights, r, mass, d, anisotropy, align, z if z is not None else d.copy())
-        index = face_indices(z, tris, edge_of_side, edges, r)
+            weight = align * anisotropy
+            weight[pinned] = args.hard
+            z, steps = aligned_field(edges, weights, r, mass, d, weight, z if z is not None else d.copy())
+        index = face_indices(z, tris, edge_of_side, edges, r, r1)
         singular = int((index != 0).sum())
         row = {"align": align, "seconds": round(time.perf_counter() - started, 2), "cg_steps": steps,
                "singularities": singular, "index_sum": int(index.sum()),

@@ -117,6 +117,7 @@ def main():
         ob = noisy_sphere(args.sphere_faces)
     for o in bpy.context.scene.objects:
         o.select_set(False)
+    ob.modifiers.clear()  # the remesh works on the mesh itself; a Subsurf would only slow the projection target
     bpy.context.view_layer.objects.active = ob
     surface = BVHTree.FromObject(ob, bpy.context.evaluated_depsgraph_get())
     width = float(np.ptp(np.array([v.co.x for v in ob.data.vertices]))) * 1.3 if len(ob.data.vertices) < 2_000_000 else 1.0

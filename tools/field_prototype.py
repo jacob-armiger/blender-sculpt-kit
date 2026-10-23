@@ -67,7 +67,7 @@ def triangles(mesh):
 
 def noisy_shape(faces, shape):
     import bmesh
-    subdivisions = int(np.ceil(np.log(faces / 20) / np.log(4) - 0.01))  # at least this many faces
+    subdivisions = int(np.ceil(np.log(faces / 20) / np.log(4) - 0.01)) + 1  # at least this many faces: 1 is the icosahedron
     bm = bmesh.new()
     bmesh.ops.create_icosphere(bm, subdivisions=subdivisions, radius=1.0)
     mesh = bpy.data.meshes.new("noisy " + shape)

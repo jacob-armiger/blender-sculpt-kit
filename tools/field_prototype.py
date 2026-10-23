@@ -758,9 +758,14 @@ def main():
             # Trivial connection: keep the field's singularities minus close pairs, and build the smoothest
             # field that has exactly those; then re-align softly on the adjusted connection.
             started_tc = time.perf_counter()
-            euler = len(co) - len(edges) + len(tris)
-            target, dropped = choose_indices(index, tris, smooth, quad, args.trivial, euler)
-            x, parent, parent_edge, order, n_gen, tc_steps, residual = trivial_connection(target, tris, edges, edge_of_side, r1, euler)
+            # The indices must sum to what the face holonomies sum to (4 chi in exact arithmetic; on a mesh
+            # whose triangles turn by more than a quarter turn the wrapped sum differs, and the solve must
+            # match the wrapped one or it has no solution).
+            sgn0 = np.where(edges[edge_of_side, 0] == tris, 1.0, -1.0)
+            wrapped = np.angle(np.exp(1j * (sgn0 * np.angle(r1)[edge_of_side]).sum(axis=1)))
+            index_total = int(np.rint(4 * wrapped.sum() / (2 * np.pi)))
+            target, dropped = choose_indices(index, tris, smooth, quad, args.trivial, index_total / 4.0)
+            x, parent, parent_edge, order, n_gen, tc_steps, residual = trivial_connection(target, tris, edges, edge_of_side, r1, index_total / 4.0)
             r1_adjusted = r1 * np.exp(1j * x)
             r_adjusted = r1_adjusted ** 4
             z = walk_field(x, parent, parent_edge, order, edges, r1)  # walk_field adds x itself

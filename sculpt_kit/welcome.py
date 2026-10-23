@@ -1,9 +1,10 @@
-"""A one-time welcome that asks about the parts of the kit that change how Blender looks and behaves.
+"""A one-time welcome that asks which parts of the kit to use.
 
-The colour theme restyles all of Blender and the ZBrush keys change Sculpt
-Mode's controls, so both start off. Right after the kit is installed, a dialog
-asks whether to use them. It is shown once; both can be changed any time in
-the add-on's preferences.
+Right after the kit is installed, a dialog lists its tools, the interface
+parts, the colour theme and the keys, so someone who wants only the brushes, or
+who already has a remesher they prefer, can leave the rest off. The theme and
+keys change how Blender looks and behaves, so they start off until picked. It
+is shown once; everything can be changed later in the add-on's preferences.
 """
 import bpy
 from bpy.props import BoolProperty, EnumProperty
@@ -17,42 +18,93 @@ THEMES = (
 )
 
 
+# (operator property, preference switches it sets): the parts someone might want, each on its own.
+TOOLS = (
+    ("brushes", ("use_kit_brushes",)),
+    ("new_sculpt", ("use_sculpt_session",)),
+    ("subtools", ("look_subtools",)),
+    ("subdivide", ("use_subdivide",)),
+    ("remesh", ("use_remesh",)),
+    ("reference", ("use_reference_view",)),
+    ("interface", ("look_layout", "look_shelf", "look_material")),
+)
+
+
+def _start_with(self, _context):
+    everything = self.start == 'ALL'
+    for name, _switches in TOOLS:
+        setattr(self, name, everything or name == "brushes")
+    if not everything:
+        self.theme = 'OFF'
+        self.keys = self.keys_all_modes = False
+
+
 class SCULPTKIT_OT_welcome(bpy.types.Operator):
-    """Choose a colour theme and whether to use the ZBrush keys"""
+    """Choose which parts of Sculpt Kit to use"""
     bl_idname = "sculptkit.welcome"
     bl_label = "Welcome to Sculpt Kit"
     bl_options = {'INTERNAL'}
 
+    start: EnumProperty(name="Start With", update=_start_with, items=(
+        ('ALL', "Everything", "Every tool on; the theme and keys as picked below"),
+        ('BRUSHES', "Brushes Only", "Only the Sculpt Kit brushes; Blender otherwise as it was")))
+    brushes: BoolProperty(name="Brushes", default=True, description="The Sculpt Kit tab in the brush shelf")
+    new_sculpt: BoolProperty(name="New Sculpt", default=True,
+                             description="Start a sculpt from an even sphere, cube or armature cylinder")
+    subtools: BoolProperty(name="Subtools", default=True, description="A list of the scene's meshes to switch between")
+    subdivide: BoolProperty(name="Subdivide", default=True, description="Quick access to Multires and subdivision")
+    remesh: BoolProperty(name="Remesh", default=True,
+                         description="Voxel remeshing by resolution, and quad remeshing that repairs the mesh first")
+    reference: BoolProperty(name="Reference View", default=True,
+                            description="Compare the sculpt side by side with a reference, at the same view and scale")
+    interface: BoolProperty(name="ZBrush-style layout, brush bar and materials", default=True,
+                            description="A ZBrush Layout button, the brush bar laid out like ZBrush's, and matcaps")
     theme: EnumProperty(name="Color Theme", items=THEMES, default='KLAY')
-    keys: BoolProperty(name="ZBrush Keys", default=False,
-                       description="In Sculpt Mode: right-drag to rotate, Alt inverts the brush, Ctrl masks, "
-                                   "and ZBrush's single-key shortcuts")
+    keys: BoolProperty(name="ZBrush keys in Sculpt Mode", default=False,
+                       description="Right-drag to rotate, Alt inverts the brush, Ctrl masks, and ZBrush's "
+                                   "single-key shortcuts")
+    keys_all_modes: BoolProperty(name="Right-drag navigation in every mode", default=False,
+                                 description="Right-drag to rotate, Alt to move, Ctrl to zoom in Object and Edit "
+                                             "Mode too; a right-click without dragging still opens Blender's menu")
 
     def invoke(self, context, _event):
-        prefs = common.prefs()
-        prefs.welcome_done = True  # shown once, however it is closed
-        self.keys = prefs.use_zbrush_keys
-        return context.window_manager.invoke_props_dialog(self, width=460, confirm_text="Done")
+        common.prefs().welcome_done = True  # shown once, however it is closed
+        return context.window_manager.invoke_props_dialog(self, width=420, confirm_text="Done")
 
     def draw(self, _context):
         col = self.layout.column()
-        col.label(text="Two optional parts change how Blender looks and behaves.")
+        col.row().prop(self, "start", expand=True)
         col.separator()
-        col.label(text="Color theme for all of Blender:")
+        col.label(text="Tools")
+        grid = col.grid_flow(columns=2, even_columns=True)
+        for name, _switches in TOOLS[:-1]:
+            grid.prop(self, name)
+        col.separator()
+        col.label(text="Interface")
+        col.prop(self, "interface")
         col.row().prop(self, "theme", expand=True)
         col.separator()
-        col.prop(self, "keys", text="Use ZBrush keys in Sculpt Mode")
-        common.info(col, "Right-drag to rotate, Alt inverts, Ctrl masks, single-key shortcuts")
+        col.label(text="Keys")
+        col.prop(self, "keys")
+        col.prop(self, "keys_all_modes")
         col.separator()
-        common.info(col, "Change either later in Preferences > Add-ons > Sculpt Kit.")
+        common.info(col, "Change any of it later in Preferences > Add-ons > Sculpt Kit.")
 
     def execute(self, _context):
         prefs = common.prefs()
         prefs.welcome_done = True
+        for name, switches in TOOLS:
+            for switch in switches:
+                setattr(prefs, switch, getattr(self, name))
         if self.theme != 'OFF':
             prefs.look_style = self.theme
         prefs.look_theme = self.theme != 'OFF'
-        prefs.use_zbrush_keys = self.keys
+        prefs.use_zbrush_look = self.subtools or self.interface or self.theme != 'OFF'
+        prefs.keys_all_modes = self.keys_all_modes
+        prefs.use_zbrush_keys = self.keys or self.keys_all_modes
+        if self.keys_all_modes and not self.keys:
+            # Only the navigation was wanted: the rest of the ZBrush keys stay as Blender has them.
+            prefs.keys_canvas = prefs.keys_modifiers = prefs.keys_hotkeys = False
         return {'FINISHED'}
 
 

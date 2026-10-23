@@ -40,7 +40,7 @@ Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt K
 
 Sculpt made using these brushes
 
-### Keys (only takes affect in Sculpt Mode)
+### Keys (only take effect in Sculpt Mode)
 
 | Action | Keys |
 |---|---|
@@ -54,7 +54,7 @@ Sculpt made using these brushes
 | Subdivision up / down, Divide | D / Shift+D, Ctrl+D |
 | Sculpt menu | Space |
 
-Keybinds can be turned on or off in Preferences.
+Keybinds can be turned on or off in Preferences. Right-drag navigation can optionally work in every mode.
 
 ## Building from source
 I've only tested in Blender 5.2.2

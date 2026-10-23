@@ -108,10 +108,12 @@ def test(sim):
               abs(wl - wr) <= 3 and abs(hl - hr) <= 3 and hr > right.height - 2 * 52 - 10,
               ((wl, hl), (wr, hr), left.width, right.width, right.height))
     shelf_top = max(r.y + r.height for r in right.regions if r.type in {'ASSET_SHELF', 'ASSET_SHELF_HEADER'})
-    sim.check("so the two pictures are level across the divider, and the reference is marked off only below the "
-              "border along the top of the sculpt's brush shelf, not beside its see-through toolbar",
+    toolbar = next(r for r in right.regions if r.type == 'TOOLS')
+    sim.check("so the two pictures are level across the divider, and the reference is marked off below the "
+              "border along the top of the sculpt's brush shelf and beside its toolbar",
               level(left, right) <= 2 and strips(right) == []
-              and strips(left) == [(0, 0, wl, shelf_top - sim.region(right).y)],
+              and any(s[1] == 0 and s[3] == shelf_top - sim.region(right).y for s in strips(left))
+              and any(s[0] == 0 and s[1] == 0 and abs(s[2] - toolbar.width) <= 2 for s in strips(left)),
               (level(left, right), strips(left), strips(right), shelf_top - sim.region(right).y))
     sim.check("the corners of the frame are the same points in both halves", frame_agrees(left, right) < 1.5,
               round(frame_agrees(left, right), 3))
@@ -159,8 +161,8 @@ def test(sim):
     sim.check("closing the tray leaves nothing marked off on the sculpt's side",
               abs(wr - wl) <= 3 and strips(right) == [], (wl, wr, strips(right)))
     shelf_top = max(r.y + r.height for r in right.regions if r.type in {'ASSET_SHELF', 'ASSET_SHELF_HEADER'})
-    sim.check("the reference half is marked off only below the shelf border",
-              strips(left) == [(0, 0, wl, shelf_top - sim.region(right).y)], strips(left))
+    sim.check("the reference half is marked off below the shelf border",
+              any(s[1] == 0 and s[3] == shelf_top - sim.region(right).y for s in strips(left)), strips(left))
     sim.check("and the frame still agrees", frame_agrees(left, right) < 1.5, round(frame_agrees(left, right), 3))
     yield from sim.nudge(right)
     sim.screenshot("frame_3_tray_closed.png")

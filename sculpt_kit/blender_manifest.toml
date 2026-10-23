@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "sculpt_kit"
-version = "0.5.3"
+version = "0.5.4"
 name = "Sculpt Kit"
 tagline = "ZBrush-style sculpting setup with one switch per feature"
 maintainer = "Jacob Armiger"

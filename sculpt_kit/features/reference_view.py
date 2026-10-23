@@ -53,7 +53,7 @@ EDGE = (1.0, 1.0, 1.0, 0.35)    # the line where that begins
 _halves_of = {}  # screen pointer -> (reference area pointer, sculpt area pointer)
 _blanked = []    # (class, attribute, what the class itself had there or None) while the reference's bars are blank
 _shown = {}      # screen pointer -> the view both halves were last brought to
-_matcaps = {}    # screen pointer -> the shared matcap name
+_matcaps = {}    # screen pointer -> the matcap both halves were last given, or None while either is not in one
 _handle = None
 _frame_handle = None
 
@@ -169,25 +169,8 @@ def _keep_in_step():
     if _bars_differ(reference_area, sculpt_area) and not bpy.app.timers.is_registered(_match_bars):
         bpy.app.timers.register(_match_bars, first_interval=0.0)
     key = screen.as_pointer()
-    reference_shading = reference_area.spaces.active.shading
-    sculpt_shading = sculpt_area.spaces.active.shading
-    reference_matcap = reference_shading.studio_light if reference_shading.light == 'MATCAP' else None
-    sculpt_matcap = sculpt_shading.studio_light if sculpt_shading.light == 'MATCAP' else None
-    if reference_matcap is not None and sculpt_matcap is not None:
-        if key not in _matcaps or _matcaps[key] is None:
-            changed = area.spaces.active.shading.studio_light
-            _matcaps[key] = changed
-        else:
-            previous = _matcaps[key]
-            changed = (reference_matcap if reference_matcap != previous else
-                       sculpt_matcap if sculpt_matcap != previous else previous)
-            _matcaps[key] = changed
-        for viewport, shading in ((reference_area, reference_shading), (sculpt_area, sculpt_shading)):
-            if shading.studio_light != changed:
-                shading.studio_light = changed
-                viewport.tag_redraw()
-    else:
-        _matcaps[key] = None
+    if _matcaps_differ(reference_area, sculpt_area) and not bpy.app.timers.is_registered(_match_matcaps):
+        bpy.app.timers.register(_match_matcaps, first_interval=0.0)  # not while drawing
     view = _view(area.spaces.active)
     if key in _shown and _same(view, _shown[key]):
         return
@@ -206,6 +189,32 @@ def _bars_differ(reference_area, sculpt_area):
     would then be a different height, and the two pictures would not be level."""
     reference, sculpt = reference_area.spaces.active, sculpt_area.spaces.active
     return any(getattr(reference, bar) != getattr(sculpt, bar) for bar in BARS)
+
+
+def _matcap(area):
+    shading = area.spaces.active.shading
+    return shading.studio_light if shading.light == 'MATCAP' else None
+
+
+def _matcaps_differ(reference_area, sculpt_area):
+    reference, sculpt = _matcap(reference_area), _matcap(sculpt_area)
+    return reference is not None and sculpt is not None and reference != sculpt
+
+
+def _match_matcaps():
+    """Give both halves of every open reference view the matcap that was just picked in either of them. The one
+    that no longer matches what both had is the one that changed; when there is nothing to go by, the sculpt's."""
+    for window in bpy.context.window_manager.windows:
+        halves = _halves(window.screen) if window.screen.get(MARK) else None
+        if halves is None or not _matcaps_differ(*halves):
+            continue
+        reference, sculpt = (_matcap(area) for area in halves)
+        before = _matcaps.get(window.screen.as_pointer())
+        picked = reference if sculpt == before else sculpt
+        for area in halves:
+            area.spaces.active.shading.studio_light = picked
+            area.tag_redraw()
+        _matcaps[window.screen.as_pointer()] = picked
 
 
 def _match_bars():
@@ -496,8 +505,7 @@ def _open(context, report):
     screen[MARK] = True
     _halves_of[screen.as_pointer()] = (reference_area.as_pointer(), sculpt_area.as_pointer())
     _shown[screen.as_pointer()] = _view(sculpt_area.spaces.active)
-    shading = sculpt_area.spaces.active.shading
-    _matcaps[screen.as_pointer()] = shading.studio_light if shading.light == 'MATCAP' else None
+    _matcaps[screen.as_pointer()] = _matcap(sculpt_area)
     return {'FINISHED'}
 
 

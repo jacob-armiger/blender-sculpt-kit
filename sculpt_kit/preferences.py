@@ -73,6 +73,10 @@ class SculptKitPreferences(bpy.types.AddonPreferences):
         name="Right-click navigation", default=True, update=_rebuild_keys,
         description="Right-drag rotates, Alt+right-drag moves, Ctrl+right-drag zooms. "
                     "Blender's right-click menu moves to Space")
+    keys_all_modes: BoolProperty(
+        name="Right-drag navigation in every mode", default=False, update=_rebuild_keys,
+        description="Right-drag to rotate, with Alt to move and Ctrl to zoom, in Object Mode, Edit Mode and the "
+                    "rest too. A right-click without dragging still opens Blender's menu")
     keys_canvas: BoolProperty(
         name="Empty-canvas navigation", default=True, update=_rebuild_keys,
         description="Dragging on the background rotates the view instead of waiting to reach the model")

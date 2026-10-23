@@ -10,8 +10,8 @@ While the invert key is held (Alt with the kit's ZBrush keys, otherwise Ctrl),
 Zadd / Zsub light the other way, as a hint of what a stroke will do. The
 brush's own setting is left alone. Blender's Python cannot ask which keys are
 down, so a pass-through Sculpt Mode key binding notes the modifier keys from
-their own presses and releases and from every mouse move, and redraws the bar
-when they change.
+their own presses and releases, and again on each click in case one was let go
+outside the window, and redraws the bar when they change.
 
 Blender has no hook for rearranging that bar, so its own draw function is
 swapped for ours, in the list Blender draws the bar from, while the part is on.
@@ -213,7 +213,7 @@ def enable(by_user=False):
     bpy.types.VIEW3D_HT_header.append(_view_switches)
     keymap = common.sculpt_keymap()
     if keymap is not None:
-        for key, value in [('MOUSEMOVE', 'ANY')] + [(k, v) for k in _MODIFIER_KEYS for v in ('PRESS', 'RELEASE')]:
+        for key, value in [('LEFTMOUSE', 'PRESS')] + [(k, v) for k in _MODIFIER_KEYS for v in ('PRESS', 'RELEASE')]:
             _keymap_items.append((keymap, keymap.keymap_items.new(
                 SCULPTKIT_OT_watch_modifiers.bl_idname, key, value, any=True)))
     common.redraw_all()

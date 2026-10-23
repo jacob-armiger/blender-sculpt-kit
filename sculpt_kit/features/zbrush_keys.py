@@ -24,6 +24,10 @@ CHEAT_SHEET = (
         "Ctrl + right-drag: zoom",
         "Space: Blender's right-click sculpt menu",
     )),
+    ("keys_all_modes", (
+        "Right-drag, Alt + right-drag and Ctrl + right-drag also navigate in Object, Edit and the other modes",
+        "A right-click without dragging still opens Blender's menu there",
+    )),
     ("keys_canvas", (
         "Drag on empty canvas: rotate",
         "Alt + drag on empty canvas: move",
@@ -268,6 +272,20 @@ def _add_keymap(prefs):
         _added.append((keymap, item))
 
 
+# Navigation for every other mode, on a drag only: a plain right-click keeps opening Blender's menu there.
+_ANYWHERE = (("view3d.rotate", ""), ("view3d.move", "alt"), ("view3d.zoom", "ctrl"))
+
+
+def _add_anywhere_keymap():
+    keyconfig = bpy.context.window_manager.keyconfigs.addon
+    if keyconfig is None:
+        return
+    keymap = keyconfig.keymaps.new(name="3D View", space_type='VIEW_3D', region_type='WINDOW')
+    for operator, modifiers in _ANYWHERE:
+        _added.append((keymap, keymap.keymap_items.new(operator, 'RIGHTMOUSE', 'CLICK_DRAG',
+                                                       ctrl="ctrl" in modifiers, alt="alt" in modifiers)))
+
+
 def _remove_keymap():
     common.remove_keymap_items(_added)
 
@@ -277,6 +295,8 @@ def rebuild():
     prefs = common.prefs()
     if prefs is not None:
         _add_keymap(prefs)
+        if prefs.keys_right_click and prefs.keys_all_modes:
+            _add_anywhere_keymap()
 
 
 def enable():

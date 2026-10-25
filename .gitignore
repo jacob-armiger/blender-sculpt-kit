@@ -3,6 +3,8 @@ __pycache__/
 *.blend1
 .test-profile/
 tests/out/
+# engine wheels built on this machine (macosx_27_0): the release ships the ones from CI
+sculpt_kit/wheels/*macosx_27_*
 build/
 dist/
 

@@ -17,12 +17,31 @@ Settings are in **Preferences > Add-ons > Sculpt Kit**, panels in the **Sculpt K
 
 ## Features
 
+- **fRemesher**: the best free remesher you can get. Has multiple tuning options.
+- **Clay and Rake Brushes**: brushes I hand tuned and enjoy
 - **Reference view:** compare your sculpt side by side with a reference, at the same view and scale
 - **Optional Zbrush-like UI and key bindings:** a KlaySculpt or ZBrush color theme, layout, brush bar and materials
 - **Spawn Sculpt-ready forms:** Sphere, cube, or cylinder made of quads
 - **Subtools:** switch between, hide and organize the meshes in your scene
 - **Subdivide:** quick access to Multires and subdivision while you sculpt
-- **Remesh:** DynaMesh-style voxel remeshing by resolution, and **Repairing Remesh**, a quad remesh built for sculpts.
+
+### fRemesher
+
+A quad remesher for sculpts, in the Sculpt Kit tab's Remesh panel. It works out where edge loops should run
+from the sculpt's curvature, builds clean quads along them, and snaps them back onto the sculpt, so a dense
+sculpt or scan becomes a light cage you can subdivide and keep sculpting.
+
+- **Faces:** about how many faces you get.
+- **Adaptive Size:** quads smaller on thin parts and across tight curves, longer along gentle ones. Low face
+  counts work best with more of it; with **Auto** on it follows Faces.
+- **Detect Edges** keeps hard edges;
+- **Follow Ridges** runs loops along ridges and
+  valleys such as a nose, brow or lips.
+- **Advanced:** mesh symmetry, cage fitting for subdivision shrinkage, rebuilding pinch points, and toggle smooth/flat shading.
+
+After a remesh, the panel in the viewport's bottom left corner has every setting, to adjust and run again.
+
+**Voxel Remesh** sits beside it: DynaMesh-style remeshing by resolution, the same density at any scale.
 
 ### Brushes
 

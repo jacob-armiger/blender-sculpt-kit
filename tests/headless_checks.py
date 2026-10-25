@@ -290,24 +290,26 @@ prefs.look_layout = True
 
 material = look.material
 GREY = "sculptkit_grey.exr"
+RED_WAX = "sculptkit_red_wax.exr"
 
 
 def matcaps():
     return [light.name for light in preferences.studio_lights if light.type == 'MATCAP']
 
 
-check("the kit's grey matcap is bundled", os.path.isfile(os.path.join(assets, "matcaps", GREY)))
+check("the kit's grey and red wax matcaps are bundled",
+      all(os.path.isfile(os.path.join(assets, "matcaps", name)) for name in (GREY, RED_WAX)))
 check("ZBrush starts on red wax and KlaySculpt on brown clay",
       prefs.look_material_zbrush == 'RED_WAX' and prefs.look_material_klay == 'BROWN_CLAY',
       (prefs.look_material_zbrush, prefs.look_material_klay))
 views = [space for screen in bpy.data.screens for area in screen.areas for space in area.spaces if space.type == 'VIEW_3D']
-if views and "red_wax.exr" in matcaps() and "clay_brown.exr" in matcaps():
+if views and "clay_brown.exr" in matcaps():
     check("the kit's grey is in Blender's list of matcaps, once", matcaps().count(GREY) == 1, matcaps().count(GREY))
     shading, other = views[0].shading, views[-1].shading
     shading.type, shading.light = 'SOLID', 'MATCAP'
     shading.studio_light = "basic_bright.exr"
     material.apply(shading)
-    check("the material is red wax in the ZBrush style", shading.studio_light == "red_wax.exr", shading.studio_light)
+    check("the material is red wax in the ZBrush style", shading.studio_light == RED_WAX, shading.studio_light)
     prefs.look_material_zbrush = 'GREY'
     check("picking Grey moves a viewport that shows a kit material over to it", shading.studio_light == GREY,
           shading.studio_light)
@@ -337,7 +339,7 @@ if views and "red_wax.exr" in matcaps() and "clay_brown.exr" in matcaps():
     check("switching it on dresses the viewports that show a matcap", shading.studio_light == GREY
           and matcaps().count(GREY) == 1, shading.studio_light)
     prefs.look_material_zbrush = 'RED_WAX'
-    check("and red wax is one pick away", shading.studio_light == "red_wax.exr", shading.studio_light)
+    check("and red wax is one pick away", shading.studio_light == RED_WAX, shading.studio_light)
 else:
     print("SKIP  material checks: no 3D viewport or matcaps in this session")
 
@@ -628,7 +630,7 @@ check("Blender's own quad remesh refuses a finely voxel-remeshed sheet",
       'CANCELLED' in bpy.ops.object.quadriflow_remesh(mode='FACES', target_faces=4000, use_mesh_symmetry=False))
 before = size(target)
 result = bpy.ops.sculptkit.quad_remesh(target_faces=4000, use_symmetry=False)
-check("Quad Remesh handles the same sheet", 'FINISHED' in result and 2000 < len(target.data.polygons) < 6500
+check("fRemesher handles the same sheet", 'FINISHED' in result and 2000 < len(target.data.polygons) < 6500
       and quad_share(target) > 0.99, "%d faces, %.0f%% quads" % (len(target.data.polygons), 100 * quad_share(target)))
 # (a coarser mesh of a wavy sheet is a little thicker; a scale mistake would be off by far more)
 check("and leaves its size alone", np.allclose(size(target), before, rtol=0.02, atol=0.02), (before, size(target)))
@@ -640,7 +642,7 @@ check("Blender's own quad remesh refuses a small, dense model",
       'CANCELLED' in bpy.ops.object.quadriflow_remesh(mode='FACES', target_faces=4000, use_mesh_symmetry=False))
 before = size(target)
 result = bpy.ops.sculptkit.quad_remesh(target_faces=4000, use_symmetry=False)
-check("Quad Remesh handles the small, dense model", 'FINISHED' in result and quad_share(target) > 0.99
+check("fRemesher handles the small, dense model", 'FINISHED' in result and quad_share(target) > 0.99
       and np.allclose(size(target), before, rtol=0.05), "%d faces, size %s" % (len(target.data.polygons), size(target)))
 
 # Real damage: an edge with three faces, a stray wire edge and a flipped face.
@@ -656,14 +658,122 @@ bm.faces.ensure_lookup_table()
 bm.faces[40].normal_flip()
 target = make_active("Damaged", bm)
 result = bpy.ops.sculptkit.quad_remesh(target_faces=3000, use_symmetry=False)
-check("Quad Remesh repairs real non-manifold damage first", 'FINISHED' in result and quad_share(target) > 0.99
+check("fRemesher repairs real non-manifold damage first", 'FINISHED' in result and quad_share(target) > 0.99
       and np.allclose(size(target), (2.0, 2.0, 2.0), rtol=0.05), "%d faces, size %s" % (len(target.data.polygons), size(target)))
 
 target = sphere(1.0)
 bpy.ops.object.mode_set(mode='SCULPT')
 result = bpy.ops.sculptkit.quad_remesh(target_faces=2000, use_symmetry=False)
-check("Quad Remesh works from Sculpt Mode and returns to it", 'FINISHED' in result and bpy.context.mode == 'SCULPT'
+check("fRemesher works from Sculpt Mode and returns to it", 'FINISHED' in result and bpy.context.mode == 'SCULPT'
       and quad_share(target) > 0.99, bpy.context.mode)
+
+# ---- fRemesher: one engine, typed-only Faces and Adaptive Size in the corner panel, a QuadriFlow stand-in
+bpy.ops.object.mode_set(mode='OBJECT')
+Op = remesh_module.SCULPTKIT_OT_quad_remesh
+engine_module = importlib.import_module(MODULE + ".features.remesh_instant")
+numbers = {"5000": 5000, "5,000": 5000, " 5 000 ": 5000, "1.5k": 1500, "2M": 2e6, "2e3": 2000, "50%": 0.5, "0.25": 0.25,
+           "1,5": None, "5,00": None, "abc": None, "": None, "nan": None, "inf": None, "k": None, "-3": -3}
+check("typed numbers are read as expected", all(remesh_module.parse_number(text) == value
+                                                 for text, value in numbers.items()),
+      {text: remesh_module.parse_number(text) for text, value in numbers.items()
+       if remesh_module.parse_number(text) != value})
+props = bpy.ops.sculptkit.quad_remesh.get_rna_type().properties.keys()
+check("there is no Engine choice any more", "engine" not in props and not hasattr(bpy.types.Scene, "sculpt_kit_quad_engine")
+      and not registered("SCULPTKIT_PT_remesh_engine"))
+check("fRemesher's native engine is loaded here", engine_module.sculpt_kit_remesh is not None
+      and getattr(engine_module.sculpt_kit_remesh, "quadriflow", None) is not None)
+check("and its labels say fRemesher", Op.bl_label == "fRemesher" and "fRemesher" in Op.__doc__
+      and "Repairing" not in Op.__doc__)
+
+kept = []
+run = Op.execute
+
+
+def execute_and_keep(self, context):
+    """Runs the operator, and keeps the values its properties hold afterwards: what the corner panel would show."""
+    result_ = run(self, context)
+    kept[:] = [{name: getattr(self, name) for name in self.properties.bl_rna.properties.keys() if name != "rna_type"}]
+    return result_
+
+
+Op.execute = execute_and_keep
+
+
+class Shown:
+    def __init__(self, values):
+        self.__dict__.update(values)
+
+
+def remeshed(**kwargs):
+    """Run fRemesher on a fresh sphere. Returns the object, the result, the report as (type, text) and the
+    properties the corner panel would show."""
+    kept.clear()
+    remesh_module.last_report = ("", "")
+    ob_ = sphere(1.0)
+    result_ = bpy.ops.sculptkit.quad_remesh(**kwargs)
+    return ob_, result_, remesh_module.last_report, Shown(kept[0]) if kept else None
+
+
+def faces_near(ob_, count):
+    return 0.7 * count < len(ob_.data.polygons) < 1.4 * count and quad_share(ob_) > 0.99
+
+
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=2000)
+check("fRemesher remeshes with its own engine", result == {'FINISHED'} and text.startswith("fRemesher: ")
+      and "QuadriFlow" not in text and faces_near(ob_, 2000), (result, text))
+check("the corner panel is given the numbers and their typed forms",
+      shown is not None and shown.target_faces == 2000 and shown.target_faces_text == "2,000"
+      and shown.adaptive_size_text == "%.2f" % shown.adaptive_size,
+      None if shown is None else (shown.target_faces, shown.target_faces_text, shown.adaptive_size_text))
+
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=4000, target_faces_text="1.5k")
+check("typed Faces (1.5k) win over the number they were typed over", result == {'FINISHED'} and faces_near(ob_, 1500)
+      and not faces_near(ob_, 4000) and shown.target_faces == 1500 and shown.target_faces_text == "1,500"
+      and "not a number" not in text, (len(ob_.data.polygons), text))
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=1200, target_faces_text="lots")
+check("Faces text that is not a number keeps the last value and says so",
+      result == {'FINISHED'} and faces_near(ob_, 1200) and shown.target_faces == 1200 and shown.target_faces_text == "1,200"
+      and 'Faces: "lots" is not a number, kept 1,200' in text and kind == 'WARNING', (len(ob_.data.polygons), text))
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=1200, target_faces_text="5")
+check("Faces below the range are raised to it, and the report says so", result == {'FINISHED'} and shown.target_faces == 100
+      and shown.target_faces_text == "100" and "Faces: 5 is outside 100 to 2,000,000, used 100" in text
+      and len(ob_.data.polygons) < 400, (len(ob_.data.polygons), text))
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=1200, adaptive_size_text="7")
+check("Adaptive Size above 1 is held at 1", result == {'FINISHED'} and shown.adaptive_size == 1.0
+      and shown.adaptive_size_text == "1.00" and "Adaptive Size: 7 is outside 0.00 to 1.00, used 1.00" in text, text)
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=1200, adaptive_size_text="50%")
+check("Adaptive Size takes a percentage", result == {'FINISHED'} and shown.adaptive_size == 0.5
+      and shown.adaptive_size_text == "0.50", None if shown is None else shown.adaptive_size)
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=1200, adaptive_size=0.25, adaptive_size_text="x")
+check("Adaptive Size text that is not a number keeps the last value", result == {'FINISHED'} and shown.adaptive_size == 0.25
+      and 'Adaptive Size: "x" is not a number, kept 0.25' in text, text)
+
+# The sidebar's values reach every run: a number left unset follows the panel, run after run
+scene = bpy.context.scene
+scene.sculpt_kit_quad_faces = 1000
+scene.sculpt_kit_quad_edges = True
+ob_, result, (kind, text), shown = remeshed()
+first = len(ob_.data.polygons)
+scene.sculpt_kit_quad_faces = 3000
+scene.sculpt_kit_quad_adaptive = 0.3
+scene.sculpt_kit_quad_edges = False
+ob_, result, (kind, text), shown = remeshed()
+check("the sidebar's Faces, Adaptive Size and Detect Edges are read on every run",
+      faces_near(ob_, 3000) and first < 0.6 * len(ob_.data.polygons) and abs(shown.adaptive_size - 0.3) < 1e-6
+      and not shown.detect_edges and shown.target_faces_text == "3,000", (first, len(ob_.data.polygons), text))
+scene.sculpt_kit_quad_adaptive = 1.0
+scene.sculpt_kit_quad_edges = True
+
+# Where the native engine does not load, QuadriFlow stands in and the report says so
+real_engine = engine_module.sculpt_kit_remesh
+engine_module.sculpt_kit_remesh = None
+ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=2000)
+engine_module.sculpt_kit_remesh = real_engine
+check("without the native engine QuadriFlow stands in, and the report warns of it", result == {'FINISHED'}
+      and faces_near(ob_, 2000) and kind == 'WARNING' and "couldn't be loaded, so Blender's QuadriFlow is used instead" in text,
+      (result, kind, text))
+Op.execute = run
+bpy.ops.object.mode_set(mode='OBJECT')
 
 # ---- switching the whole extension off and on
 bpy.ops.object.mode_set(mode='OBJECT')

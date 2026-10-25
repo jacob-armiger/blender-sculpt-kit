@@ -6,9 +6,9 @@ its clay. Picking one, or changing style, also moves the viewports that are
 showing one of the three over to it; switching the part off returns them to
 Blender's plain matcap.
 
-Red wax and brown clay ship with Blender. The grey is the kit's own, lit like
-ZBrush's MatCap Gray (tools/build_matcap.py makes it), and is loaded into
-Blender's list of matcaps while the part is on.
+Brown clay ships with Blender. The red wax and the grey are the kit's own, lit
+like ZBrush's red wax and MatCap Gray (tools/build_matcap.py makes them), and
+are loaded into Blender's list of matcaps while the part is on.
 """
 import os
 
@@ -23,7 +23,7 @@ MATERIALS = (
     ('GREY', "Grey", "A neutral grey, lit like ZBrush's MatCap Gray"),
     ('BROWN_CLAY', "Brown clay", "KlaySculpt's clay"),
 )
-MATCAPS = {'RED_WAX': "red_wax.exr", 'GREY': "sculptkit_grey.exr", 'BROWN_CLAY': "clay_brown.exr"}
+MATCAPS = {'RED_WAX': "sculptkit_red_wax.exr", 'GREY': "sculptkit_grey.exr", 'BROWN_CLAY': "clay_brown.exr"}
 PLAIN = "basic_bright.exr"  # what Blender's own Sculpting workspace uses
 OWN = os.path.join(brush_library.ASSETS, "matcaps")  # matcaps the kit brings with it
 

@@ -1,0 +1,27 @@
+diff --git a/src/extract.cpp b/src/extract.cpp
+index 5a38653..5adb8a0 100644
+--- a/src/extract.cpp
++++ b/src/extract.cpp
+@@ -317,6 +317,11 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+         cout.flush();
+         bool changed;
+         uint32_t nRemoved = 0, nSnapped = 0;
++        /* Sculpt Kit: this repeat-until-settled loop ran for over ten minutes on a noisy 1.3M-face input
++           at a 100k target (each pass rescans every two-ring, and snapping creates new candidates), so it
++           is capped. A pass is a full sweep; the result after the cap is as valid as any other pass. */
++        const int max_passes = 20;
++        int passes = 0;
+         do {
+             changed = false;
+             cout << ".";
+@@ -487,7 +492,9 @@ extract_graph(const MultiResolutionHierarchy &mRes, bool extrinsic, int rosy, in
+                     }
+                 }
+             }
+-        } while (changed);
++        } while (changed && ++passes < max_passes);
++        if (changed)
++            cout << " (stopped after " << max_passes << " passes)";
+         cout << " done. (snapped " << nSnapped << " vertices, removed " << nRemoved << " edges, took " << timeString(timer.reset()) << ")" << endl;
+     }
+ 

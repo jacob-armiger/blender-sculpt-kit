@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "sculpt_kit"
-version = "0.5.5"
+version = "0.6.0"
 name = "Sculpt Kit"
 tagline = "ZBrush-style sculpting setup with one switch per feature"
 maintainer = "Jacob Armiger"
@@ -10,6 +10,17 @@ type = "add-on"
 blender_version_min = "5.2.0"
 
 license = ["SPDX:GPL-3.0-or-later"]
+
+# fRemesher's engine (native/, built by .github/workflows/native-wheels.yml): one stable-ABI wheel per platform.
+# `extension build --split-platforms` makes one zip each. Where the wheel is missing or fails to load, fRemesher
+# falls back to Blender's QuadriFlow.
+# A release carries the CI's wheels under these names (RELEASING.md); a local build is never committed.
+platforms = ["macos-arm64", "windows-x64", "linux-x64"]
+wheels = [
+    "./wheels/sculpt_kit_remesh-0.0.3-cp312-abi3-macosx_11_0_arm64.whl",
+    "./wheels/sculpt_kit_remesh-0.0.3-cp312-abi3-win_amd64.whl",
+    "./wheels/sculpt_kit_remesh-0.0.3-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+]
 
 [permissions]
 clipboard = "Copy the active brush's settings for tuning"

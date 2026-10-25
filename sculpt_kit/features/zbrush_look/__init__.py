@@ -51,7 +51,7 @@ OPTIONS = (
     )),
     ("look_material", (
         "New sculpts and the ZBrush layout start in the material picked here. Each style remembers its own",
-        "The grey is lit like ZBrush's MatCap Gray. The material picker in the viewport header changes the pick too",
+        "Red wax and grey are lit like ZBrush's own. The material picker in the viewport header changes the pick too",
     )),
 )
 

@@ -28,7 +28,7 @@ FEATURES = (
             sculpt_session.enable, sculpt_session.disable),
     Feature("remesh", "Remesh tools",
             "Voxel Remesh (Ctrl + R) evens out a sculpt's mesh at the same detail whatever its size, like DynaMesh. "
-            "Repairing Remesh turns a dense sculpt into clean quads while keeping its shape",
+            "fRemesher turns a dense sculpt into clean quads whose edge loops follow its forms",
             remesh.enable, remesh.disable),
     Feature("subdivide", "Subdivide",
             "Sidebar panel for subdivision levels like ZBrush's: Divide, Lower / Higher, SDiv, and a plain Subdivide Mesh",

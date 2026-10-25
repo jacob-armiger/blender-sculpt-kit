@@ -78,7 +78,7 @@ def test(sim):
     sim.check("the brush bar is the ZBrush shelf", look.shelf.in_place())
     sim.check("the viewport header has the view switches and the material picker",
               hasattr(bpy.types, "SCULPTKIT_PT_material"))
-    sim.check("a new sculpt starts in red wax", matcap() == "red_wax.exr", matcap())
+    sim.check("a new sculpt starts in red wax", matcap() == "sculptkit_red_wax.exr", matcap())
     sim.screenshot("look_1_zbrush_shelf.png")
 
     prefs.look_material_zbrush = 'GREY'
@@ -95,7 +95,7 @@ def test(sim):
     result = sim.call(bpy.ops.sculptkit.material, material='RED_WAX')
     yield 0.5
     sim.check("the picker's own button goes back to red wax, and remembers it", result == {'FINISHED'}
-              and matcap() == "red_wax.exr" and prefs.look_material_zbrush == 'RED_WAX', matcap())
+              and matcap() == "sculptkit_red_wax.exr" and prefs.look_material_zbrush == 'RED_WAX', matcap())
 
     # ------------------------------------------------------------------ layout
     came_from = workspace()
@@ -111,7 +111,7 @@ def test(sim):
     tray = next(r for r in sim.area.regions if r.type == 'UI')
     sim.check("with the Sculpt Kit tray open beside it", sim.space().show_region_ui and tray.width > 100
               and tray.active_panel_category == "Sculpt Kit", (tray.width, tray.active_panel_category))
-    sim.check("still in Sculpt Mode, in red wax", bpy.context.mode == 'SCULPT' and matcap() == "red_wax.exr",
+    sim.check("still in Sculpt Mode, in red wax", bpy.context.mode == 'SCULPT' and matcap() == "sculptkit_red_wax.exr",
               (bpy.context.mode, matcap()))
     sim.check("looking at the model from where you were", close(sim.rv3d().view_matrix, view_before, 1e-3))
     sim.check("building it added nothing else to the file", counts() == data_before,
@@ -342,7 +342,7 @@ def test(sim):
     sim.check("and takes the kit's grey out of Blender's matcaps", not loaded("sculptkit_grey.exr"))
     prefs.look_material = True
     yield 0.3
-    sim.check("and switching it on puts the style's material back", matcap() == "red_wax.exr"
+    sim.check("and switching it on puts the style's material back", matcap() == "sculptkit_red_wax.exr"
               and loaded("sculptkit_grey.exr"), matcap())
 
     prefs.look_theme = False
@@ -369,7 +369,7 @@ def test(sim):
     prefs.use_zbrush_look = True
     yield 0.8
     sim.check("and brings it back", theme.wearing() == 'ZBRUSH' and look.shelf.in_place()
-              and matcap() == "red_wax.exr" and hasattr(bpy.types, "SCULPTKIT_PT_subtools"),
+              and matcap() == "sculptkit_red_wax.exr" and hasattr(bpy.types, "SCULPTKIT_PT_subtools"),
               (theme.wearing(), matcap()))
 
 

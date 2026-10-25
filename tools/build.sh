@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the brush library, the colour themes and the grey matcap, and package the extension into dist/.
+# Build the brush library, the colour themes and the matcaps, and package the extension into dist/.
 #   tools/build.sh             also builds the local Archive library
 #   tools/build.sh --release   for a release: skips it
 set -euo pipefail

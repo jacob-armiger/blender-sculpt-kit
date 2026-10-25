@@ -23,8 +23,8 @@ TOOLS = (
     ("brushes", ("use_kit_brushes",)),
     ("new_sculpt", ("use_sculpt_session",)),
     ("subtools", ("look_subtools",)),
+    ("remesh", ("use_remesh",)),  # heads the second column (the grid fills columns first)
     ("subdivide", ("use_subdivide",)),
-    ("remesh", ("use_remesh",)),
     ("reference", ("use_reference_view",)),
     ("interface", ("look_layout", "look_shelf", "look_material")),
 )
@@ -53,8 +53,9 @@ class SCULPTKIT_OT_welcome(bpy.types.Operator):
                              description="Start a sculpt from an even sphere, cube or armature cylinder")
     subtools: BoolProperty(name="Subtools", default=True, description="A list of the scene's meshes to switch between")
     subdivide: BoolProperty(name="Subdivide", default=True, description="Quick access to Multires and subdivision")
-    remesh: BoolProperty(name="Remesh", default=True,
-                         description="Voxel remeshing by resolution, and Repairing Remesh: quad remeshing built for dense sculpts")
+    remesh: BoolProperty(name="fRemesher", default=True,
+                         description="Voxel remeshing by resolution, and fRemesher: quad remeshing whose edge loops "
+                                     "follow the forms of a dense sculpt")
     reference: BoolProperty(name="Reference View", default=True,
                             description="Compare the sculpt side by side with a reference, at the same view and scale")
     interface: BoolProperty(name="ZBrush-style layout, brush bar and materials", default=True,

@@ -35,8 +35,7 @@ sculpt or scan becomes a light cage you can subdivide and keep sculpting.
 - **Adaptive Size:** quads smaller on thin parts and across tight curves, longer along gentle ones. Low face
   counts work best with more of it; with **Auto** on it follows Faces.
 - **Detect Edges** keeps hard edges;
-- **Follow Ridges** runs loops along ridges and
-  valleys such as a nose, brow or lips.
+- **Follow Ridges** runs loops along ridges and valleys such as a nose, brow or lips.
 - **Advanced:** mesh symmetry, cage fitting for subdivision shrinkage, rebuilding pinch points, and toggle smooth/flat shading.
 
 After a remesh, the panel in the viewport's bottom left corner has every setting, to adjust and run again.

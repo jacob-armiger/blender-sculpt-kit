@@ -1,5 +1,5 @@
 """fRemesher's layout: a cross field aligned to the sculpt's curvature, handed frozen to the native engine's
-QuadriFlow back half (its Instant Meshes entry on engines built before that).
+QuadriFlow back half.
 
 The pipeline, on a proxy rather than the sculpt itself:
   1. Proxy: a Voxel Remesh of a copy at a few times the target count (even triangles; detail finer than a
@@ -16,8 +16,8 @@ The pipeline, on a proxy rather than the sculpt itself:
      Connections on Discrete Surfaces"): the smallest change of the connection that has exactly those
      singularities, whose parallel field is then re-aligned to curvature.
   6. The engine is given the smoothed proxy and the field, frozen: it builds its position field and quads on
-     exactly our directions. QuadriFlow's back half by default (its integer flow closes the lattice, so the
-     quads have no poles beyond the field's own); Instant Meshes' where the native wheel predates it.
+     exactly our directions: QuadriFlow's back half (its integer flow closes the lattice, so the quads have no
+     poles beyond the field's own).
   7. Adaptive Size: two quad sizes per vertex, short across curvature and long along it, capped on thin
      parts, then made consistent with the field (see consistent_sizes) and given to QuadriFlow with it.
 
@@ -36,7 +36,11 @@ N_SYM = 4  # a cross field: four directions at right angles
 # targets: on the Apollo Lykeios at 3k, 0.05 keeps a size spread of 2.5 and QuadriFlow builds 0.64 of it
 # (in logs), 0.0005 keeps 1.8 and it builds 0.82.
 SIZE_FIT = 0.05
+# The field follows curvature by share of the surface, so its pull against the (dimensionless) smoothing is the same
+# at any model size: a mesh of this area gets the pull of a vertex's area in mesh units, as the casts always did.
+ALIGN_AREA = 4.0
 CREASE_ANGLE = 60.0  # degrees: Detect Edges keeps the sculpt's edges folding more than this (sculpt_creases)
+CREASE_PAIR_REACH = 0.02  # quads: with Detect Edges, how near a +1/-1 pair of singularities is cancelled
 # Ridges (ridge_lines): how far the normal must turn across one quad (radians), and the shortest line kept (quads)
 RIDGE_TURN = 0.6
 RIDGE_LENGTH = 3.0
@@ -994,6 +998,7 @@ def solve(co, tris, target, smoothing=3.0, align=1.0, reach=6.0, realign=1.0, mi
     open_edges = np.bincount(edge_of_side.ravel(), minlength=len(edges)) == 1
     on_crease = np.zeros(len(co), dtype=bool)
     crease_direction = None
+    pair_reach = reach  # how near (in quads) a +1/-1 pair of singularities is cancelled
     if creases is not None:
         # proxy vertices beside a crease of the sculpt are pinned along it in the field. Also leaving them
         # unsmoothed and giving QuadriFlow a line through the crease there over-constrains it: on the Apollo
@@ -1005,16 +1010,21 @@ def solve(co, tris, target, smoothing=3.0, align=1.0, reach=6.0, realign=1.0, mi
         for i, p in enumerate(points):
             tree.insert(p, i)
         tree.balance()
-        reach = 0.75 * float(np.median(np.linalg.norm(co[edges[:, 0]] - co[edges[:, 1]], axis=1)))
+        crease_reach = 0.75 * float(np.median(np.linalg.norm(co[edges[:, 0]] - co[edges[:, 1]], axis=1)))
+        # With Detect Edges, only pole pairs on top of each other are cancelled. The pairs left in work as the poles
+        # density changes need: cancelling within 6 quads instead cut the David's irregular vertices 321 to 51 but
+        # raised sculpt missed p95 0.43 to 0.57%, with less square quads and more wobble (25 Oct).
+        pair_reach = CREASE_PAIR_REACH
         crease_direction = np.zeros((len(co), 3))
         for i, p in enumerate(co):
             _q, k, d = tree.find(Vector(p))
-            if d < reach:
+            if d < crease_reach:
                 on_crease[i] = True
                 crease_direction[i] = directions[k]
         report["crease_vertices"] = int(on_crease.sum())
     smooth, report["smoothing_steps"] = taubin(co, edges, target, area, smoothing, open_edges)
     normals, mass, area = vertex_normals_and_areas(smooth, tris)
+    pull = mass * ALIGN_AREA / area
     quad = (area / target) ** 0.5
     tx, ty = tangent_bases(smooth, normals, edges)
     theta, k1, k2 = principal_directions(smooth, normals, edges, tx, ty)
@@ -1043,13 +1053,13 @@ def solve(co, tris, target, smoothing=3.0, align=1.0, reach=6.0, realign=1.0, mi
     weight[pinned] = hard
 
     started = time.perf_counter()
-    z, report["cg_steps"] = aligned_field(edges, weights, r, mass, d, weight, d.copy())
+    z, report["cg_steps"] = aligned_field(edges, weights, r, pull, d, weight, d.copy())
     index = face_indices(z, tris, edge_of_side, edges, r, r1)
     report["aligned_singularities"] = int((index != 0).sum())
     report["aligned_seconds"] = round(time.perf_counter() - started, 2)
     say("aligned field: %d singularities, %.1fs" % (report["aligned_singularities"], report["aligned_seconds"]))
 
-    if reach > 0.0:
+    if pair_reach > 0.0:
         started = time.perf_counter()
         parent, parent_edge, order, piece = spanning_forest(len(co), edges)
         face_piece = piece[tris[:, 0]]
@@ -1077,7 +1087,7 @@ def solve(co, tris, target, smoothing=3.0, align=1.0, reach=6.0, realign=1.0, mi
             raw[piece[edges[es[0], 0]]] += N_SYM * needed / (2 * np.pi)
         totals = np.rint(raw).astype(int)
         report["index_total_off"] = float(np.abs(raw - totals).max())  # should be ~0: the rows are consistent
-        chosen, report["dropped"] = choose_indices(index, tris, smooth, quad, reach, totals, face_piece)
+        chosen, report["dropped"] = choose_indices(index, tris, smooth, quad, pair_reach, totals, face_piece)
         given, seen = [], set()
         for (es, ss, needed), lp in zip(loops, loop_piece.tolist()):
             if lp in seen:
@@ -1092,7 +1102,7 @@ def solve(co, tris, target, smoothing=3.0, align=1.0, reach=6.0, realign=1.0, mi
         if realign > 0.0:  # follow curvature again, on the adjusted connection: the poles stay where they are
             weight = realign * confidence
             weight[pinned] = hard
-            z, _ = aligned_field(edges, weights, r, mass, d, weight, z)
+            z, _ = aligned_field(edges, weights, r, pull, d, weight, z)
         index = face_indices(z, tris, edge_of_side, edges, r, r1)
         report["pieces"] = len(totals)
         on_open = np.zeros(len(edges), dtype=bool)
@@ -1154,6 +1164,11 @@ def _quadriflow(mesh, target, directions, boundary, seed=0, scale=None):
     co = coordinates(mesh).astype(np.float32)
     steering = {"fill_holes": False} if boundary else {}
     tris = triangles(mesh)
+    if not np.isfinite(co).all() or not len(tris) or tris.min() < 0 or tris.max() >= len(co):
+        raise RuntimeError("the mesh has vertices or faces the engine cannot read")
+    sizes_dropped = scale is not None and not (np.isfinite(scale).all() and (scale > 0).all())
+    if sizes_dropped:  # a size solve that did not converge: even quads rather than a failed remesh
+        scale = None
     if scale is not None:  # only then: engines built before the size field do not know the argument
         steering["scale"] = np.ascontiguousarray(scale, dtype=np.float32)  # n x 2, along and across `directions`
     run = lambda asked: remesh_instant.sculpt_kit_remesh.quadriflow(
@@ -1162,17 +1177,38 @@ def _quadriflow(mesh, target, directions, boundary, seed=0, scale=None):
     out = run(target)
     if scale is not None and abs(len(out["quads"]) - target) > 0.1 * target and len(out["quads"]):
         # With uneven sizes QuadriFlow's count lands well off its target (5,547 for 8,933 on the Head of
-        # David): once more, asking for the target scaled by the miss.
-        out = run(int(target * target / len(out["quads"])))
+        # David): once more, asking for the target scaled by the miss, and the nearer of the two is kept (the
+        # count swings run to run, so the second can land further off)
+        again = run(int(target * target / len(out["quads"])))
+        if len(again["quads"]) and abs(len(again["quads"]) - target) < abs(len(out["quads"]) - target):
+            out = again
     if not len(out["quads"]):
         raise RuntimeError("QuadriFlow gave no faces")
     remesh_instant._replace_geometry(mesh, out["vertices"], {4: out["quads"]})
     return {"engine": "quadriflow", "engine_singularities": out["singularities"],
             "position_singularities": out["position_singularities"], "vertices_added": out["vertices_added"],
-            "remesh": out["seconds"]}
+            "remesh": out["seconds"], "sizes_dropped": sizes_dropped}
 
 
-def remesh(ob, target, context, smoothing=1.0, align=1.0, mirror_axis=None, adaptive=0.0, seed=0, back_end=None,
+_creases_cache = {}  # the last sculpt's hard edges, so a new Seed or setting does not search them again
+
+
+def _sculpt_creases_cached(mesh, target):
+    """sculpt_creases of the sculpt `mesh` at this face count, remembered for the same sculpt and count (as
+    ZRemesher 4.0 keeps its mesh analysis for Retry): on a dense scan the search takes seconds, and a rerun
+    from the corner panel with another Seed would repeat it for the same answer."""
+    import hashlib
+    co = coordinates(mesh)
+    key = (len(co), len(mesh.polygons), target, hashlib.blake2b(co.tobytes(), digest_size=16).hexdigest())
+    if key not in _creases_cache:
+        tris = triangles(mesh)
+        _, _, area = vertex_normals_and_areas(co, tris)
+        _creases_cache.clear()
+        _creases_cache[key] = sculpt_creases(co, tris, (area / target) ** 0.5)
+    return _creases_cache[key]
+
+
+def remesh(ob, target, context, smoothing=1.0, align=1.0, mirror_axis=None, adaptive=0.0, seed=0,
            detect_edges=False, ridges=False, log=None):
     """The form-following remesh of the object's mesh as a new mesh (not yet projected onto the sculpt), a
     report, a BVH of the smoothed proxy (the surface at quad scale, for patches the quads cannot follow), and
@@ -1180,16 +1216,15 @@ def remesh(ob, target, context, smoothing=1.0, align=1.0, mirror_axis=None, adap
     detect_edges: the field is pinned along the sculpt's hard edges (sculpt_creases).
     Creases are not kept yet: found on the proxy, by fold angle alone, they pick up a scan's curls and noise
     and add poles (Head of David at 5k: 22 irregular vertices without, 42 with folds over 90 degrees). seed: another layout of the same
-    field (QuadriFlow starts its position field at random). back_end: "quadriflow" or "instant"; None picks
-    QuadriFlow when the wheel has it. adaptive: 0 for one quad size, up to 1 for quads short across curvature
+    field (QuadriFlow starts its position field at random). adaptive: 0 for one quad size, up to 1 for quads short across curvature
     and long along it, and smaller on thin parts (target_sizes, made consistent with the field). Holes the engine leaves are filled,
     except the sculpt's own openings (which the caller keeps, remesh._fill_stray_holes) and a half's cut.
     Raises RuntimeError when the engine is missing or fails."""
     from . import remesh_instant
     if not remesh_instant.available() or remesh_instant.sculpt_kit_remesh is None:
         raise RuntimeError("the native remesh engine is not built for this platform")
-    if back_end is None:
-        back_end = "quadriflow" if has_quadriflow() else "instant"
+    if not has_quadriflow():  # every engine since 0.0.2 has it; the bundled one is 0.0.4
+        raise RuntimeError("the native remesh engine is too old for fRemesher (no QuadriFlow in it)")
     mesh = make_proxy(ob, proxy_faces(target), context)
     open_sculpt = bool((np.bincount(_corner_edges(mesh), minlength=len(mesh.edges)) == 1).any())
     asymmetric = False
@@ -1207,24 +1242,17 @@ def remesh(ob, target, context, smoothing=1.0, align=1.0, mirror_axis=None, adap
             raise RuntimeError("nothing left to remesh")
         creases = None
         if detect_edges:
-            sculpt_co, sculpt_tris = coordinates(ob.data), triangles(ob.data)
-            _, _, sculpt_area = vertex_normals_and_areas(sculpt_co, sculpt_tris)
-            creases = sculpt_creases(sculpt_co, sculpt_tris, (sculpt_area / target) ** 0.5)
-        field = solve(co, tris, share, smoothing=3.0 * smoothing, align=align, mirror_axis=mirror_axis,
+            creases = _sculpt_creases_cached(ob.data, target)
+        field = solve(co, tris, share, smoothing=3.0 * smoothing, align=align, realign=align, mirror_axis=mirror_axis,
                       adaptive=adaptive, creases=creases, ridges=ridges, log=log)
         mesh.attributes["position"].data.foreach_set("vector", field["positions"].astype(np.float32).ravel())
         mesh.update()
         has_open = open_sculpt or mirror_axis is not None
-        if back_end == "quadriflow":
-            # open edges (a half, or an open sculpt) must be kept, or QuadriFlow's lattice frays along them
-            stats = _quadriflow(mesh, share, field["directions"], boundary=has_open, seed=seed, scale=field["scale"])
-        else:
-            stats = remesh_instant.remesh(mesh, share, pure_quad=True, orientation=field["directions"],
-                                          orientation_weight=np.ones(len(co), dtype=np.float32),
-                                          freeze_orientation=True, align_to_boundaries=mirror_axis is not None,
-                                          fill_holes=not has_open,
-                                          edge_length=None if field["scale"] is None
-                                          else np.sqrt(field["scale"].prod(axis=1)) * field["quad"])
+        # open edges (a half, or an open sculpt) must be kept, or QuadriFlow's lattice frays along them
+        stats = _quadriflow(mesh, share, field["directions"], boundary=has_open, seed=seed, scale=field["scale"])
+        if not has_open:  # QuadriFlow's filling leaves its smallest gaps, three-sided ones between its quads
+            stats["open_edges_filled"] = remesh_instant._fill_holes(mesh)
+            remesh_instant._close_slivers(mesh)
         if has_open and not open_sculpt:
             # a half of a closed sculpt: every hole but the cut is the engine's own
             cut = 0.3 * field["quad"]

@@ -5,6 +5,7 @@
 #include "config.hpp"
 #include "field-math.hpp"
 #include <queue>
+#include <random>
 #include "localsat.hpp"
 #include "pcg32/pcg32.h"
 #ifdef WITH_TBB
@@ -68,8 +69,9 @@ void Hierarchy::Initialize(double scale, int with_scale) {
     mCQ.resize(mV.size());
     mCQw.resize(mV.size());
 
-    //Set random seed
-    srand(rng_seed);
+    // Sculpt Kit: was srand and rand, process-wide and not thread safe, see README.sculptkit
+    std::mt19937 rng(rng_seed);
+    const auto uniform = [&rng] { return (double)rng() / std::mt19937::max(); };
 
     mScale = scale;
     for (int i = 0; i < mV.size(); ++i) {
@@ -80,10 +82,9 @@ void Hierarchy::Initialize(double scale, int with_scale) {
         for (int j = 0; j < mN[i].cols(); ++j) {
             Vector3d s, t;
             coordinate_system(mN[i].col(j), s, t);
-            //rand() is not thread safe!
-            double angle = ((double)rand()) / RAND_MAX * 2 * M_PI;
-            double x = ((double)rand()) / RAND_MAX * 2 - 1.f;
-            double y = ((double)rand()) / RAND_MAX * 2 - 1.f;
+            double angle = uniform() * 2 * M_PI;
+            double x = uniform() * 2 - 1.f;
+            double y = uniform() * 2 - 1.f;
             mQ[i].col(j) = s * std::cos(angle) + t * std::sin(angle);
             mO[i].col(j) = mV[i].col(j) + (s * x + t * y) * scale;
             if (with_scale) {

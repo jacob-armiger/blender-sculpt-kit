@@ -726,6 +726,72 @@ check("the corner panel is given the numbers and their typed forms",
       and shown.adaptive_size_text == "%.2f" % shown.adaptive_size,
       None if shown is None else (shown.target_faces, shown.target_faces_text, shown.adaptive_size_text))
 
+def failing_at(name, fail):
+    """Run fRemesher on a sphere with a Decimate modifier while the named stage raises."""
+    kept.clear()
+    remesh_module.last_report = ("", "")
+    ob_ = sphere(1.0)
+    decimate = ob_.modifiers.new("Decimate", 'DECIMATE')
+    before, meshes = ob_.data, set(bpy.data.meshes)
+    stage = getattr(remesh_module, name)
+
+    def stop(*_args, **_kwargs):
+        raise fail
+
+    setattr(remesh_module, name, stop)
+    try:
+        result_ = bpy.ops.sculptkit.quad_remesh(use_symmetry=False, target_faces=1000)
+    except RuntimeError as error:  # an operator's ERROR report arrives here as an exception
+        result_ = {'CANCELLED'} if "fRemesher failed" in str(error) else error
+    finally:
+        setattr(remesh_module, name, stage)
+    return (result_ == {'CANCELLED'} and ob_.data is before and decimate.show_viewport
+            and set(bpy.data.meshes) == meshes and "fRemesher failed" in remesh_module.last_report[1],
+            (result_, ob_.data.name, decimate.show_viewport, len(set(bpy.data.meshes) - meshes)))
+
+
+for name, fail in (("_project_and_relax", ValueError("stage failed")), ("_repair_pinches", RuntimeError("stage failed")),
+                   ("_pinch_points", IndexError("stage failed"))):
+    passed, details = failing_at(name, fail)
+    check("a remesh failing in %s leaves the sculpt, its modifiers and no stray mesh" % name, passed, details)
+
+field_module = importlib.import_module(MODULE + ".features.remesh_field")
+ob_ = sphere(1.0)
+ob_.data.vertices[0].co.x = float("nan")
+try:
+    field_module._quadriflow(ob_.data, 500, np.tile([1.0, 0.0, 0.0], (len(ob_.data.vertices), 1)), False)
+    refused = False
+except RuntimeError as error:
+    refused = "cannot read" in str(error)
+check("a vertex that is not a number is refused before it reaches the engine", refused)
+
+kept.clear()
+ob_ = sphere(1.0)
+ob_.vertex_groups.new(name="Group")
+ob_.data.uv_layers.new(name="UV")
+bpy.ops.sculptkit.quad_remesh(use_symmetry=False, target_faces=1000)
+check("the report names what a remesh leaves behind",
+      "Not carried over: vertex groups, UVs" in remesh_module.last_report[1], remesh_module.last_report)
+kept.clear()
+ob_ = sphere(1.0)
+ob_.data.use_mirror_x = ob_.data.use_mirror_z = True
+bpy.ops.sculptkit.quad_remesh(use_symmetry=True, target_faces=1000)
+check("and that with X and Z on, only X was used", "Symmetry used on X only" in remesh_module.last_report[1],
+      remesh_module.last_report)
+
+bm = bmesh.new()
+bmesh.ops.create_uvsphere(bm, u_segments=8, v_segments=8, radius=1.0)
+ob_ = make_active("Poles", bm)
+surface = remesh_module._Sculpt(ob_, bpy.context.evaluated_depsgraph_get())
+work = ob_.data.copy()
+near_pole = lambda co_: abs(co_.z) > 0.7  # the poles and the rings next to them; the equator's rings are not rebuilt
+middle = {tuple(round(c, 5) for c in v.co) for v in work.vertices if not near_pole(v.co)}
+rebuilt = remesh_module._repair_pinches(work, surface)
+left = {tuple(round(c, 5) for c in v.co) for v in work.vertices if not near_pole(v.co)}
+check("rebuilding a pinch point relaxes the corners around it and no others", rebuilt == 2 and middle <= left,
+      (rebuilt, len(middle - left)))
+bpy.data.meshes.remove(work)
+
 ob_, result, (kind, text), shown = remeshed(use_symmetry=False, target_faces=4000, target_faces_text="1.5k")
 check("typed Faces (1.5k) win over the number they were typed over", result == {'FINISHED'} and faces_near(ob_, 1500)
       and not faces_near(ob_, 4000) and shown.target_faces == 1500 and shown.target_faces_text == "1,500"

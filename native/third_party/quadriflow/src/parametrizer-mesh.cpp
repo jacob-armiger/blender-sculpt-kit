@@ -442,7 +442,7 @@ void Parametrizer::FixValence()
                     break;
                 }
                 deid = deid1 / 4 * 4 + (deid1 + 1) % 4;
-            } while (deid != deid0 && deid != -1 && count < 256);
+            } while (deid != deid0 && deid != -1 && count < 256);  // Sculpt Kit: capped
             if (deid == -1)
                 count += 1;
             valences[i] = count;
@@ -473,7 +473,7 @@ void Parametrizer::FixValence()
                 if (deid1 == -1)
                     break;
                 deid = deid1 / 4 * 4 + (deid1 + 1) % 4;
-            } while (deid != deid0 && deid != -1 && loop_dedges.size() < 256);
+            } while (deid != deid0 && deid != -1 && loop_dedges.size() < 256);  // Sculpt Kit: capped
             if (marked || loop_dedges.size() >= 256)
                 continue;
 

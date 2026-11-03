@@ -5,8 +5,8 @@ bound in memory: arrays in, polygons out, and a hook for an orientation field co
 Where its wheel is not built for the platform, sculpt_kit_remesh is None and fRemesher falls back to Blender's own
 QuadriFlow (remesh.py).
 
-remesh() here drives the engine's Instant Meshes entry. fRemesher uses it only with an engine built before
-QuadriFlow was added to it; with the current engine remesh_field.py calls the engine's quadriflow() instead.
+remesh() here drives the engine's Instant Meshes entry. fRemesher does not use it (remesh_field.py calls the
+engine's quadriflow()); it stays for lab/rig/field_prototype.py, the research prototype.
 Pure quads come from subdividing every face of Instant Meshes' quad-dominant result into four, so it is asked for
 a quarter of the target count; it has no seed and no symmetry.
 """
@@ -88,6 +88,25 @@ def _fill_holes(mesh, keep=None):
         mesh.update()
     bm.free()
     return count
+
+
+def _close_slivers(mesh, rounds=8):
+    """Close the gaps a closed mesh still has after _fill_holes, which refuses a sliver: each round collapses the
+    shortest open edge (on the Capitoline Antinous at 7k, a three-sided gap with one edge 0.09 mm long)."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    changed = False
+    for _ in range(rounds):
+        open_edges = [e for e in bm.edges if e.is_boundary]
+        if not open_edges:
+            break
+        bmesh.ops.collapse(bm, edges=[min(open_edges, key=lambda e: e.calc_length())], uvs=False)
+        changed = True
+    if changed:
+        bm.to_mesh(mesh)
+        mesh.update()
+    bm.free()
 
 
 def remesh(mesh, target_faces, pure_quad=True, crease_angle=-1.0, deterministic=True, smooth_iterations=2,

@@ -23,7 +23,12 @@ Sculpt Kit's own code that drives it is in ../../src/qflow_bridge.cpp. Changes m
 - src/parametrizer-mesh.cpp, Parametrizer::FixValence(): every walk around a vertex is capped at 256 turns
   and both of its repeat-until-unchanged loops at 64 rounds. Around a non-manifold fan a walk never returns
   to where it started; on a closed cast frozen to our field with sharp edges kept it ran for half an hour.
+- src/hierarchy.cpp, Hierarchy::Initialize(): the random start of the position and orientation fields used srand
+  and rand, which are process-wide: with the GIL released, another thread calling rand changes the layout
+  (with one spare thread, 6 different results and 2,699 to 2,956 faces from one seed). It now draws from a
+  local std::mt19937 seeded with rng_seed, which also gives the same numbers on every platform.
 - src/parametrizer.hpp, src/parametrizer-flip.cpp: a flag_fill_holes switch (on by default, as before) around
-  the two calls to FixHoles(), which fills every hole of under 25 vertices. On an open sculpt that also
+  the call to FixHoles(), which fills every hole of under 25 vertices. The same switch sits on a second call inside
+  a commented-out block, which does not run. On an open sculpt that also
   closed small real openings; the kit turns it off there and fills only the holes that do not lie on the
   sculpt's own open edges.

@@ -1,4 +1,4 @@
-"""Close the Option C loop: feed a field from tools/field_prototype.py into the native engine.
+"""Close the Option C loop: feed a field from lab/rig/field_prototype.py into the native engine.
 
     python native/tests/field_to_engine.py tests/out/field/field_align_1.npz [--target 20000] [--out DIR]
 

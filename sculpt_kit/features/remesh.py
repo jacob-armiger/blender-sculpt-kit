@@ -31,6 +31,7 @@ always allow dragging, and every tick of a drag would rerun the remesh): see _ty
 """
 import math
 import re
+import traceback
 
 import bmesh
 import bpy
@@ -126,6 +127,17 @@ class _Sculpt:
                 self.rim.balance()
 
 
+    def _facing(self, points, directions, samples=200):
+        """1 when the sculpt's normals point the way the directions do, -1 when they point against them (a
+        sculpt with inward normals): the sign of the median agreement at the nearest points of a sample."""
+        step = max(1, len(points) // samples)
+        agree = []
+        for point, d in zip(points[::step], directions[::step]):
+            _hit, normal, _index, _distance = self.surface.find_nearest(Vector(point))
+            if normal is not None:
+                agree.append(normal.dot(Vector(d)))
+        return -1.0 if agree and float(np.median(agree)) < 0.0 else 1.0
+
     def find_nearest(self, point):
         return self.surface.find_nearest(point)
 
@@ -137,9 +149,12 @@ class _Sculpt:
         within about 80 degrees of the direction): across a narrow space, between the legs or under an arm,
         the nearer surface along the line is often the other side, and snapping there webs the two together.
         Without such a hit the nearest point, if it faces the same way, else the point stays where it is. For
-        points on open edges (on_rim: onto the sculpt's own open edges), the nearest point."""
+        points on open edges (on_rim: onto the sculpt's own open edges), the nearest point. "The same way" allows
+        for a sculpt whose normals all point inward (a flipped scan): the returned normals are then turned to
+        match the directions, so a second round can pass them back in."""
         out = np.empty_like(points)
         normals = np.empty_like(points)
+        facing = self._facing(points, directions) if directions is not None else 1.0
         for i, point in enumerate(points):
             p = Vector(point)
             if on_rim is not None and self.rim is not None and on_rim[i]:
@@ -148,19 +163,19 @@ class _Sculpt:
                 d = Vector(directions[i])
                 ahead = self.surface.ray_cast(p, d, reach)
                 behind = self.surface.ray_cast(p, -d, reach)
-                hits = [h for h in (ahead, behind) if h[0] is not None and h[1].dot(d) > 0.2]
+                hits = [h for h in (ahead, behind) if h[0] is not None and facing * h[1].dot(d) > 0.2]
                 if hits:
                     hit = min(hits, key=lambda h: h[3])
                     out[i] = hit[0]
-                    normals[i] = hit[1]
+                    normals[i] = facing * hit[1]
                     continue
                 hit, normal, _index, _distance = self.surface.find_nearest(p)
-                if hit is None or normal.dot(d) <= 0.2:  # only the other side of a gap is near: stay
+                if hit is None or facing * normal.dot(d) <= 0.2:  # only the other side of a gap is near: stay
                     out[i] = point
                     normals[i] = directions[i]
                     continue
                 out[i] = hit
-                normals[i] = normal
+                normals[i] = facing * normal
                 continue
             hit, normal, _index, _distance = self.surface.find_nearest(p)
             out[i] = hit if hit is not None else p
@@ -176,6 +191,16 @@ def _unhide_result(ob):
     for m in hiding:
         m.show_viewport = False
     return hiding
+
+
+def _not_carried(ob):
+    """What a remesh leaves behind, by name: the new mesh keeps none of it."""
+    mesh = ob.data
+    names = {".sculpt_mask": "a mask", ".sculpt_face_set": "Face Sets"}
+    lost = [name for attribute, name in names.items() if attribute in mesh.attributes]
+    lost += [name for present, name in ((len(ob.vertex_groups), "vertex groups"), (mesh.shape_keys, "shape keys"),
+                                        (len(mesh.uv_layers), "UVs"), (len(mesh.color_attributes), "colours")) if present]
+    return lost
 
 
 def _shown_note(hidden):
@@ -452,7 +477,10 @@ def _snap_to_ridges(mesh, sculpt, ridges, reach=1.0, parallel=0.7):
             count[v] += 1
     moving = np.flatnonzero((count > 0) & np.array([votes.get(stretch[v], 0) >= 2 for v in range(len(co))]))
     if len(moving):
-        target, _normals = sculpt.snap(total[moving] / count[moving][:, None])
+        # along the cage's own normals, facing the same way, as _project_and_relax snaps: the nearest point can
+        # be the other wall of a narrow space
+        directions, line = _snap_lines(mesh, co)
+        target, _normals = sculpt.snap(total[moving] / count[moving][:, None], None, directions[moving], line)
         co[moving] = target
         _set_coordinates(mesh, co)
     return len(moving)
@@ -509,10 +537,11 @@ def _fit_to_subdivision(mesh, sculpt, rounds=6, smoothing=FIT_SMOOTHING):
                             + np.bincount(edges[:, 1], weights=v[edges[:, 0], axis], minlength=len(v)))
         return out / count
     start = co.copy()
+    directions, line = _snap_lines(mesh, co)  # the limit points are snapped along these, as the cage was
     for _ in range(rounds):
         at = limit(co)
         move = np.zeros_like(co)
-        move[movable] = sculpt.snap(at[movable])[0] - at[movable]
+        move[movable] = sculpt.snap(at[movable], None, directions[movable], line)[0] - at[movable]
         for _ in range(smoothing):
             move = 0.5 * (move + neighbour_mean(move))
         co[movable] += move[movable]
@@ -617,7 +646,7 @@ def _repair_pinches(mesh, sculpt, rounds=10):
             if not any(f.index in taken for f in pole.link_faces):
                 chosen.append(pole)
                 taken.update(f.index for f in pole.link_faces)
-        ring = {v.index for pole in chosen for e in pole.link_edges for v in e.verts}
+        ring = {v for pole in chosen for e in pole.link_edges for v in e.verts}
         bmesh.ops.dissolve_verts(bm, verts=chosen)
         for face in [f for f in bm.faces if len(f.verts) > 4]:
             while face is not None and len(face.verts) > 4:
@@ -628,6 +657,8 @@ def _repair_pinches(mesh, sculpt, rounds=10):
                 corners = corners[start:] + corners[:start]
                 cut = bmesh.ops.connect_verts(bm, verts=[corners[0], corners[3]])
                 face = next((f for e in cut["edges"] for f in e.link_faces if len(f.verts) > 4), None)
+        bm.verts.index_update()  # dissolving renumbered them
+        moving = np.array(sorted(v.index for v in ring if v.is_valid), dtype=np.int64)
         tried = mesh.copy()
         bm.to_mesh(tried)
         bm.free()
@@ -639,7 +670,6 @@ def _repair_pinches(mesh, sculpt, rounds=10):
         co = _coordinates(tried).astype(np.float64)
         graph, on_rim = _relax_graph(tried)
         directions, reach = _snap_lines(tried, co)
-        moving = np.array(sorted(i for i in ring if i < len(co)), dtype=np.int64)
         for _ in range(rounds):
             target = co[moving] + 0.5 * (_graph_mean(co, graph)[moving] - co[moving])
             co[moving], directions[moving] = sculpt.snap(target, on_rim[moving], directions[moving], reach)
@@ -871,17 +901,29 @@ back onto it"""
                 self.adaptive_auto = False
         self._typed("adaptive_size", 0.0, 1.0, False, notes)
         sharp, field_engine = self.preserve_sharp, _field_engine()
+        if ob.mode == 'SCULPT' and not self.is_repeat():
+            # Strokes are undone by Sculpt Mode's own steps, which cannot be replayed onto a mesh with other
+            # vertices: without a step here, undoing the remesh stays put, then falls back past every stroke
+            # to the last whole-file step. So a whole-file step goes here, with the strokes in the mesh (leaving
+            # Sculpt Mode writes them there) and in Sculpt Mode, where undoing should land. A rerun from the
+            # corner panel already has this step behind it.
+            bpy.ops.object.mode_set(mode='OBJECT')
+            bpy.ops.object.mode_set(mode='SCULPT')
+            bpy.ops.ed.undo_push(message="Before fRemesher")
         with common.object_mode(context):
             original = ob.data
+            lost = _not_carried(ob)
             shown = _unhide_result(ob)  # before reading the sculpt, which a viewport Decimate would thin out
-            surface = _Sculpt(ob, context.evaluated_depsgraph_get())  # the sculpt, to snap back onto
-            closed = _open_edges(original) == 0
-            result, repairs, holes, unfolded, rebuilt, pinches = {'CANCELLED'}, {}, False, 0, 0, 0
-            work, asymmetric, ridges = None, False, None
-            if field_engine:
-                mirror = next((axis for axis, on in enumerate((original.use_mirror_x, original.use_mirror_y,
-                                                               original.use_mirror_z)) if on), None)
-                try:
+            work = None
+            try:
+                surface = _Sculpt(ob, context.evaluated_depsgraph_get())  # the sculpt, to snap back onto
+                closed = _open_edges(original) == 0
+                result, repairs, holes, unfolded, rebuilt, pinches = {'CANCELLED'}, {}, False, 0, 0, 0
+                asymmetric, ridges = False, None
+                if field_engine:
+                    axes = [axis for axis, on in enumerate((original.use_mirror_x, original.use_mirror_y,
+                                                            original.use_mirror_z)) if on]
+                    mirror, mirrors = axes[0] if axes else None, len(axes)
                     work, report, _coarse, ridges = remesh_field.remesh(
                         ob, target, context, smoothing=self.smoothing, align=self.follow_forms,
                         adaptive=self.adaptive_size, seed=self.seed, detect_edges=self.detect_edges,
@@ -892,46 +934,52 @@ back onto it"""
                         _fill_stray_holes(work, surface)
                     holes = closed and _open_edges(work) > 0
                     asymmetric = report.get("asymmetric", False)
-                except RuntimeError as error:
-                    for m in shown:
-                        m.show_viewport = True
-                    _report(self, 'ERROR', "fRemesher failed: %s" % error)
-                    return {'CANCELLED'}
-            for attempt in range(0 if work is not None else 2):  # QuadriFlow: holes get one more try with another seed
-                work = original.copy()
-                ob.data = work
-                _smooth_for_field(work, target, self.smoothing * (1.5 if attempt else 1.0))
-                scale, repairs = prepare_for_quadriflow(work)
-                try:
-                    result = bpy.ops.object.quadriflow_remesh(
-                        mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
-                        use_preserve_sharp=sharp, use_preserve_boundary=not closed,
-                        smooth_normals=self.smooth_normals,
-                        preserve_attributes=True, seed=self.seed + attempt)
-                except RuntimeError:  # QuadriFlow reports a refusal as an error, not as a cancelled result
-                    result = {'CANCELLED'}
-                finally:
-                    _scale_mesh(work, 1.0 / scale)
-                holes = 'FINISHED' in result and closed and _open_edges(work) > 0
-                if 'FINISHED' in result and (not holes or attempt == 1):
-                    break
+                for attempt in range(0 if work is not None else 2):  # QuadriFlow: holes get one more try with another seed
+                    work = original.copy()
+                    ob.data = work
+                    _smooth_for_field(work, target, self.smoothing * (1.5 if attempt else 1.0))
+                    scale, repairs = prepare_for_quadriflow(work)
+                    try:
+                        result = bpy.ops.object.quadriflow_remesh(
+                            mode='FACES', target_faces=target, use_mesh_symmetry=self.use_symmetry,
+                            use_preserve_sharp=sharp, use_preserve_boundary=not closed,
+                            smooth_normals=self.smooth_normals,
+                            preserve_attributes=True, seed=self.seed + attempt)
+                    except RuntimeError:  # QuadriFlow reports a refusal as an error, not as a cancelled result
+                        result = {'CANCELLED'}
+                    finally:
+                        _scale_mesh(work, 1.0 / scale)
+                    holes = 'FINISHED' in result and closed and _open_edges(work) > 0
+                    if 'FINISHED' in result and (not holes or attempt == 1):
+                        break
+                    ob.data = original
+                    bpy.data.meshes.remove(work)
+                    work = None
+                if work is not None:
+                    _project_and_relax(work, surface)
+                    if ridges is not None:
+                        _snap_to_ridges(work, surface, ridges)
+                    # fRemesher's quads are left as they snap: unfolding pulled patches off the sculpt (onto the
+                    # smoothed proxy where faces stayed bad), on the Apollo Lykeios at 3k sculpt missed p95 0.62 to
+                    # 0.88% and folds 10 to 32, and hid webs rather than mending them
+                    unfolded = 0 if field_engine else _unfold(work, surface)
+                    rebuilt = _repair_pinches(work, surface) if self.repair_pinches else 0
+                    pinches = _pinch_points(work)
+                    if field_engine and self.fit_subdivision:
+                        _fit_to_subdivision(work, surface)
+                    if field_engine:  # Blender's QuadriFlow sets the shading itself (smooth_normals)
+                        work.shade_smooth() if self.smooth_normals else work.shade_flat()
+            except Exception as error:  # a failure at any stage leaves the sculpt as it was: its mesh, its modifiers
                 ob.data = original
-                bpy.data.meshes.remove(work)
-                work = None
+                if work is not None:
+                    bpy.data.meshes.remove(work)
+                for m in shown:
+                    m.show_viewport = True
+                if not isinstance(error, RuntimeError):
+                    traceback.print_exc()
+                _report(self, 'ERROR', "fRemesher failed: %s" % error)
+                return {'CANCELLED'}
             if work is not None:
-                _project_and_relax(work, surface)
-                if ridges is not None:
-                    _snap_to_ridges(work, surface, ridges)
-                # fRemesher's quads are left as they snap: unfolding pulled patches off the sculpt (onto the
-                # smoothed proxy where faces stayed bad), on the Apollo Lykeios at 3k sculpt missed p95 0.62 to
-                # 0.88% and folds 10 to 32, and hid webs rather than mending them
-                unfolded = 0 if field_engine else _unfold(work, surface)
-                rebuilt = _repair_pinches(work, surface) if self.repair_pinches else 0
-                pinches = _pinch_points(work)
-                if field_engine and self.fit_subdivision:
-                    _fit_to_subdivision(work, surface)
-                if field_engine:  # Blender's QuadriFlow sets the shading itself (smooth_normals)
-                    work.shade_smooth() if self.smooth_normals else work.shade_flat()
                 name = original.name
                 if original.users == 0:
                     bpy.data.meshes.remove(original)
@@ -943,7 +991,7 @@ back onto it"""
                 m.show_viewport = True
             _report(self, 'ERROR', "fRemesher's engine couldn't be loaded, and the QuadriFlow stand-in failed"
                         + (" even after repairs (%s)" % repaired if repaired else "")
-                        + ". Try another Seed in the corner panel (Advanced), or more Smoothing")
+                        + ". Try another Seed in the corner panel, or more Smoothing")
             return {'CANCELLED'}
         _report(self, 'WARNING' if holes or pinches or notes or not field_engine else 'INFO',
                 "fRemesher: {:,} faces".format(len(work.polygons))
@@ -954,7 +1002,9 @@ back onto it"""
                 + (". Not mirror-symmetric, so remeshed whole" if asymmetric else "")
                 + (". It has holes" if holes else "")
                 + (". %d pinch point%s" % (pinches, "s" if pinches > 1 else "") if pinches else "")
-                + (": try another Seed in the corner panel (Advanced)" if holes or pinches else "")
+                + (": try another Seed in the corner panel" if holes or pinches else "")
+                + (". Not carried over: " + ", ".join(lost) if lost else "")
+                + (". Symmetry used on %s only" % "XYZ"[mirror] if field_engine and self.use_symmetry and mirrors > 1 else "")
                 + "".join(". " + note for note in notes)
                 + _shown_note(shown))
         return {'FINISHED'}
@@ -1062,7 +1112,8 @@ class SCULPTKIT_PT_remesh_quads_advanced(_RemeshPart, bpy.types.Panel):
         col.use_property_decorate = False
         col.enabled = not _has_multires(context.active_object)
         col.prop(scene, "sculpt_kit_quad_symmetry")
-        col.prop(scene, "sculpt_kit_quad_fit")
+        if _field_engine():  # fRemesher's own step: the QuadriFlow stand-in has no fit, as the corner panel shows
+            col.prop(scene, "sculpt_kit_quad_fit")
         col.prop(scene, "sculpt_kit_quad_pinches")
         col.prop(scene, "sculpt_kit_quad_smooth")
 

@@ -5,6 +5,7 @@
     instead of files, keeps polygons of any side count, and accepts per-vertex orientation constraints so a
     field computed elsewhere can drive the layout.
 */
+#include <cmath>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/optional.h>
@@ -352,6 +353,10 @@ static nb::dict quadriflow(Points vertices, Triangles faces, int target_faces, s
         throw std::runtime_error("scale needs one row per vertex");
     if (scale && !orientation)
         throw std::runtime_error("scale needs an orientation: its two sizes are along and across it");
+    if (scale)  // std::max in the bridge would pass a NaN straight on into QuadriFlow's scale field
+        for (size_t i = 0; i < scale->shape(0) * 2; ++i)
+            if (!std::isfinite(scale->data()[i]) || scale->data()[i] <= 0.0f)
+                throw std::runtime_error("scale needs finite, positive sizes");
     QFlowOptions options;
     options.target_faces = target_faces;
     options.preserve_sharp = preserve_sharp;
@@ -381,7 +386,7 @@ static nb::dict quadriflow(Points vertices, Triangles faces, int target_faces, s
 
 NB_MODULE(_engine, m) {
     m.doc() = "Sculpt Kit's quad remesh engines: Instant Meshes and QuadriFlow in memory";
-    m.def("version", [] { return "0.0.3 (Instant Meshes 7b31608, QuadriFlow from Blender)"; });
+    m.def("version", [] { return "0.0.4 (Instant Meshes 7b31608, QuadriFlow from Blender)"; });
     m.def("quadriflow", &quadriflow, nb::arg("vertices"), nb::arg("faces"), nb::arg("target_faces") = 10000,
           nb::arg("orientation").none() = nb::none(), nb::arg("preserve_sharp") = false,
           nb::arg("preserve_boundary") = false, nb::arg("adaptive_scale") = false,

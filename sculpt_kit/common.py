@@ -68,6 +68,13 @@ def object_mode(context):
                 pass  # the object cannot be put in that mode
 
 
+def view_tangent_per_pixel(space, region):
+    """How wide one pixel of a viewport's canvas is as an angle (its tangent) at the view's centre, from its lens.
+    A viewport shows twice the angle a camera with that lens on a 36 mm frame would, across its longer side
+    (measured in Blender 5.2, perspective and orthographic alike)."""
+    return 36.0 / space.lens / (max(region.width, region.height) / 2)
+
+
 def sculpt_keymap():
     """The add-on Sculpt Mode keymap, or None when Blender runs without one (in the background)."""
     keyconfig = bpy.context.window_manager.keyconfigs.addon

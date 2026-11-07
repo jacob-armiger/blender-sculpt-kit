@@ -60,7 +60,7 @@ class SCULPTKIT_OT_welcome(bpy.types.Operator):
                             description="Compare the sculpt side by side with a reference, at the same view and scale")
     interface: BoolProperty(name="ZBrush-style layout, brush bar and materials", default=True,
                             description="A ZBrush Layout button, the brush bar laid out like ZBrush's, and matcaps")
-    theme: EnumProperty(name="Color Theme", items=THEMES, default='KLAY')
+    theme: EnumProperty(name="Color Theme", items=THEMES, default='OFF')  # it changes Blender's look: off until picked
     keys: BoolProperty(name="ZBrush keys in Sculpt Mode", default=False,
                        description="Right-drag to rotate, Alt inverts the brush, Ctrl masks, and ZBrush's "
                                    "single-key shortcuts")

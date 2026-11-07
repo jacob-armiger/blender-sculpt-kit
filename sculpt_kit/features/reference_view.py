@@ -11,6 +11,16 @@ Whatever is done to the view in one half, the other follows. The focal length
 follows the sculpt half, adjusted for the sizes of the two halves so that the
 model is drawn at the same scale in both.
 
+The shading is kept the same too: everything in the Shading popover, from
+Solid, Material Preview or Rendered and the lighting (Flat, Studio or Matcap,
+which one, its rotation, strength and blur) to background, cavity, shadows
+and X-ray. Whichever half a setting is changed in, the other follows. Each
+half keeps its own Color section and its own Matcap Flip (which Blender does not
+let add-ons read). The reference half starts as a copy of the sculpt's, so where
+the sculpt is shown by Attribute or Texture colour the reference starts in
+Material instead: a scanned reference carries colour layers of its own (Cast
+Hall's masks show purple and yellow), and its bars draw nothing to change it by.
+
 The reference half's header, tool header and brush shelf stay, so that its
 canvas is the same height as the sculpt's, but they draw nothing: the only
 controls on screen are the sculpt half's.
@@ -29,12 +39,10 @@ canvas. The two pictures are then level across the divider as well. Wherever
 one half still shows more than the other (a panel lies over part of a canvas,
 the divider was dragged), the extra is dimmed, and the edge of what is left
 bright is the same place in both.
-
-Versions before 0.3.1 had the halves share a hidden camera with Lock Camera to
-View. That fell out of step as soon as one half left camera view, which is what
-switching perspective off does. A file saved with such a view open is tidied
-up the first time the button is pressed in it.
 """
+import functools
+import math
+
 import bpy
 import gpu
 from bpy.props import BoolProperty, PointerProperty
@@ -43,7 +51,6 @@ from gpu_extras.batch import batch_for_shader
 from .. import common
 
 MARK = "sculpt_kit_reference_view"             # on a screen while its reference view is open
-LEGACY_CAMERA = "sculpt_kit_reference_camera"  # on the hidden camera that earlier versions looked through
 REFERENCE_NAMES = ("Reference", "References", "Ref", "reference", "references", "ref")
 TOLERANCE = 1e-5
 SLIVER = 3                      # pixels: a difference between the halves this small is not marked
@@ -51,9 +58,10 @@ DIM = (0.0, 0.0, 0.0, 0.4)      # over what one half shows and the other does no
 EDGE = (1.0, 1.0, 1.0, 0.35)    # the line where that begins
 
 _halves_of = {}  # screen pointer -> (reference area pointer, sculpt area pointer)
-_blanked = []    # (class, attribute, what the class itself had there or None) while the reference's bars are blank
+_blanked = []    # (class, attribute, what the class itself had there or None, ours) while the reference's bars are blank
+_blanking = False  # off: a wrapper of ours that another add-on wrapped in turn (so it stays) just passes through
 _shown = {}      # screen pointer -> the view both halves were last brought to
-_matcaps = {}    # screen pointer -> the matcap both halves were last given, or None while either is not in one
+_shadings = {}   # screen pointer -> the shading both halves were last given
 _handle = None
 _frame_handle = None
 
@@ -79,7 +87,7 @@ def _halves(screen):
 
 
 def is_open(screen):
-    return bool(_legacy_areas(screen)) or (bool(screen.get(MARK)) and _halves(screen) is not None)
+    return bool(screen.get(MARK)) and _halves(screen) is not None
 
 
 def _forget(screen):
@@ -87,7 +95,7 @@ def _forget(screen):
         del screen[MARK]
     _halves_of.pop(screen.as_pointer(), None)
     _shown.pop(screen.as_pointer(), None)
-    _matcaps.pop(screen.as_pointer(), None)
+    _shadings.pop(screen.as_pointer(), None)
 
 
 # -------------------------------------------------------- keeping them in step
@@ -160,7 +168,11 @@ def _keep_in_step():
     if screen is None or area is None or not screen.get(MARK):
         return
     halves = _halves(screen)
-    if halves is None or area not in halves:
+    if halves is None:  # one half was closed with Blender's own Close Area
+        if not bpy.app.timers.is_registered(_tidy_broken):
+            bpy.app.timers.register(_tidy_broken, first_interval=0.0)  # not while drawing
+        return
+    if area not in halves:
         return
     reference_area, sculpt_area = halves
     _match_scale(reference_area, sculpt_area)
@@ -169,8 +181,8 @@ def _keep_in_step():
     if _bars_differ(reference_area, sculpt_area) and not bpy.app.timers.is_registered(_match_bars):
         bpy.app.timers.register(_match_bars, first_interval=0.0)
     key = screen.as_pointer()
-    if _matcaps_differ(reference_area, sculpt_area) and not bpy.app.timers.is_registered(_match_matcaps):
-        bpy.app.timers.register(_match_matcaps, first_interval=0.0)  # not while drawing
+    if _shadings_differ(reference_area, sculpt_area) and not bpy.app.timers.is_registered(_match_shading):
+        bpy.app.timers.register(_match_shading, first_interval=0.0)  # not while drawing
     view = _view(area.spaces.active)
     if key in _shown and _same(view, _shown[key]):
         return
@@ -191,30 +203,62 @@ def _bars_differ(reference_area, sculpt_area):
     return any(getattr(reference, bar) != getattr(sculpt, bar) for bar in BARS)
 
 
-def _matcap(area):
+# Set first, in this order: which studio lights and background choices there are depends on them.
+_SHADING_FIRST = ("type", "light", "background_type", "studio_light")
+# The Color section stays each half's own: a reference coloured by the sculpt's choice shows its own colour
+# attributes or materials (a sculpt in Attribute colour turned a scanned reference purple and yellow).
+_SHADING_OWN = {"color_type", "single_color", "wireframe_color_type"}
+
+
+@functools.cache
+def _shading_settings():
+    """Every setting in the viewport's Shading popover that a script can set, but the Color section's, the ones
+    others depend on first."""
+    rest = [p.identifier for p in bpy.types.View3DShading.bl_rna.properties
+            if not p.is_readonly and p.type not in {'POINTER', 'COLLECTION'}
+            and p.identifier not in _SHADING_FIRST and p.identifier not in _SHADING_OWN]
+    return _SHADING_FIRST + tuple(rest)
+
+
+def _shading(area):
+    """How a viewport shades the model, as a tuple of _shading_settings()."""
     shading = area.spaces.active.shading
-    return shading.studio_light if shading.light == 'MATCAP' else None
+    return tuple(_plain(getattr(shading, name)) for name in _shading_settings())
 
 
-def _matcaps_differ(reference_area, sculpt_area):
-    reference, sculpt = _matcap(reference_area), _matcap(sculpt_area)
-    return reference is not None and sculpt is not None and reference != sculpt
+def _shadings_differ(reference_area, sculpt_area):
+    return not _same(_shading(reference_area), _shading(sculpt_area))
 
 
-def _match_matcaps():
-    """Give both halves of every open reference view the matcap that was just picked in either of them. The one
-    that no longer matches what both had is the one that changed; when there is nothing to go by, the sculpt's."""
+def _shade(area, values):
+    """Give a viewport these shading settings, touching only what differs."""
+    shading = area.spaces.active.shading
+    for name, value in zip(_shading_settings(), values):
+        if not _close_to(_plain(getattr(shading, name)), value):
+            try:
+                setattr(shading, name, value)
+            except (TypeError, ValueError):
+                pass  # a choice the other half's settings do not offer here
+
+
+def _match_shading():
+    """Give both halves of every open reference view the shading that was just set in either of them: the
+    lighting (Flat, Studio, Matcap and which one, its rotation, strength and blur), background, cavity, shadows,
+    X-ray and the rest of the Shading popover but its Color section, and Solid, Material Preview or Rendered. Setting by
+    setting, the half that no longer matches what both had is the one that changed; when there is nothing to
+    go by, the sculpt's."""
     for window in bpy.context.window_manager.windows:
         halves = _halves(window.screen) if window.screen.get(MARK) else None
-        if halves is None or not _matcaps_differ(*halves):
+        if halves is None or not _shadings_differ(*halves):
             continue
-        reference, sculpt = (_matcap(area) for area in halves)
-        before = _matcaps.get(window.screen.as_pointer())
-        picked = reference if sculpt == before else sculpt
+        reference, sculpt = (_shading(area) for area in halves)
+        before = _shadings.get(window.screen.as_pointer())
+        picked = tuple(r if _close_to(r, s) or (before is not None and _close_to(s, b)) else s
+                       for r, s, b in zip(reference, sculpt, before or sculpt))
         for area in halves:
-            area.spaces.active.shading.studio_light = picked
+            _shade(area, picked)
             area.tag_redraw()
-        _matcaps[window.screen.as_pointer()] = picked
+        _shadings[window.screen.as_pointer()] = _shading(halves[1])
 
 
 def _match_bars():
@@ -272,7 +316,7 @@ def _blank_bars():
         drawn = cls.draw
 
         def draw(self, context):
-            if not _in_reference_half(context):
+            if not (_blanking and _in_reference_half(context)):
                 drawn(self, context)
         draw._draw_funcs = functions
         return draw
@@ -281,18 +325,27 @@ def _blank_bars():
         allowed = cls.asset_poll
 
         def asset_poll(cls_, asset):
-            return not _in_reference_half(bpy.context) and allowed(asset)
+            return not (_blanking and _in_reference_half(bpy.context)) and allowed(asset)
         return classmethod(asset_poll)
 
+    global _blanking
+    _blanking = True
     for cls, name, wrap in ((bpy.types.VIEW3D_HT_header, "draw", blank_draw),
                             (bpy.types.VIEW3D_HT_tool_header, "draw", blank_draw),
                             (bpy.types.VIEW3D_AST_brush_sculpt, "asset_poll", blank_assets)):
-        _blanked.append((cls, name, cls.__dict__.get(name)))
-        setattr(cls, name, wrap(cls))
+        ours = wrap(cls)
+        _blanked.append((cls, name, cls.__dict__.get(name), ours))
+        setattr(cls, name, ours)
 
 
 def _unblank_bars():
-    for cls, name, own in reversed(_blanked):
+    """Put back what the classes had, where ours is still what they hold. Where another add-on has wrapped ours
+    since, putting back would throw its wrapper away: ours stays in its chain and passes straight through."""
+    global _blanking
+    _blanking = False
+    for cls, name, own, ours in reversed(_blanked):
+        if cls.__dict__.get(name) is not ours:
+            continue
         if own is None:
             delattr(cls, name)
         else:
@@ -306,33 +359,52 @@ def _unblank_bars():
 # The brush shelf is see-through too, but the halves are compared at the border along its top, as Jacob asked.
 # The toolbar is not see-through: its left edge must be matched on the reference side.
 SEE_THROUGH = {'HUD'}
+# A sidebar or toolbar floating over the canvas shows its own background where the theme gives it one (Blender's own
+# gives none), else only the panels or buttons on it, which Blender draws this far in from the region's edge, in
+# pixels per unit of interface scale (measured in Blender 5.2, at 1 and 1.5): the edge the eye sees.
+INSET = {'UI': 7, 'TOOLS': 8}
+
+
+def _inset(region):
+    """How far in from a region's inner edge its visible edge is, in pixels."""
+    if region.type not in INSET or bpy.context.preferences.themes[0].regions.sidebars.back[3] > 0.05:
+        return 0
+    return round(INSET[region.type] * bpy.context.preferences.system.ui_scale)
 
 
 def _clear(area, blank=False):
     """The part of a viewport's canvas that no panel hides, as (left, bottom, right, top) in pixels
     from the middle of the canvas, which is where both halves show the same point. `blank` is for the reference
-    half, whose bars draw nothing: where they float over the canvas, it shows through them."""
+    half, whose bars draw nothing: where they float over the canvas, it shows through them.
+
+    Read from the layout alone, whatever the colour theme: Blender floats a bar over the canvas only while its colour
+    is see-through, and otherwise lays the canvas out beside it, which the position test below finds."""
     canvas = common.window_region(area)
     left, bottom, right, top = 0, 0, canvas.width, canvas.height
-    see_through_bars = bpy.context.preferences.themes[0].view_3d.space.header[3] < 1.0  # an empty one hides nothing
     for region in area.regions:
         if region.type == 'WINDOW' or region.width <= 1 or region.height <= 1:  # hidden ones are a pixel wide
             continue
-        if region.type in SEE_THROUGH or (blank and region.type in {'HEADER', 'TOOL_HEADER'} and see_through_bars):
+        if region.type in SEE_THROUGH or (blank and region.type in {'HEADER', 'TOOL_HEADER'}):
             continue  # beside the canvas it is not over it; over it, the canvas shows through
         if (region.x >= canvas.x + canvas.width or region.x + region.width <= canvas.x
                 or region.y >= canvas.y + canvas.height or region.y + region.height <= canvas.y):
             continue  # beside the canvas, not over it
         if region.alignment == 'LEFT':
-            left = max(left, region.x + region.width - canvas.x)
+            left = max(left, region.x + region.width - _inset(region) - canvas.x)
         elif region.alignment == 'RIGHT':
-            right = min(right, region.x - canvas.x)
+            right = min(right, region.x + _inset(region) - canvas.x)
         elif region.alignment == 'BOTTOM':
             bottom = max(bottom, region.y + region.height - canvas.y)
         elif region.alignment == 'TOP':
             top = min(top, region.y - canvas.y)
     x, y = canvas.width / 2, canvas.height / 2
     return left - x, bottom - y, right - x, top - y
+
+
+def visible_part(area):
+    """The part of a viewport's canvas that no panel hides, as (left, bottom, right, top) in pixels from its middle:
+    what the eye sees of it, between the toolbar, sidebar, bars and shelf. Frame Sculpt (zbrush_keys) fits to it."""
+    return _clear(area)
 
 
 def shared_frame(screen):
@@ -352,27 +424,67 @@ def bands(screen, area):
     canvas = common.window_region(area)
     width, height, x, y = canvas.width, canvas.height, canvas.width / 2, canvas.height / 2
     own = _clear(area, blank=area == _halves(screen)[0])
-    x0 = x + frame[0] if frame[0] - own[0] > SLIVER else 0
-    x1 = x + frame[2] if own[2] - frame[2] > SLIVER else width
+    x0 = _pixel(x + frame[0]) if frame[0] - own[0] > SLIVER else 0
+    x1 = _pixel(x + frame[2]) if own[2] - frame[2] > SLIVER else width
     strips = []
     if x0 > 0:
         strips.append((0, 0, x0, height))
     if x1 < width:
         strips.append((x1, 0, width, height))
     if frame[1] - own[1] > SLIVER:
-        strips.append((x0, 0, x1, y + frame[1]))
+        strips.append((x0, 0, x1, _pixel(y + frame[1])))
     if own[3] - frame[3] > SLIVER:
-        strips.append((x0, y + frame[3], x1, height))
+        strips.append((x0, _pixel(y + frame[3]), x1, height))
     return strips
 
 
+def _pixel(position):
+    """A position measured from a canvas's middle, back on the pixel grid: the halves' canvases can differ in
+    width, so the middle can fall between two pixels."""
+    return math.floor(position + 0.5)
+
+
+def panes(screen, area):
+    """With Panes Under Panels, the strips of the sculpt half's canvas beyond the frame both halves share, down its
+    right side and along its bottom, as (x0, y0, x1, y1) in canvas pixels: under its sidebar and brush shelf, which
+    float over the canvas in pieces and leave its edges broken. Shaded as the reference half's are, the edges then
+    run the full length in both halves."""
+    halves = _halves(screen) if screen.get(MARK) else None
+    if (halves is None or area != halves[1] or not bpy.context.scene.sculpt_kit_reference_panes
+            or area.spaces.active.region_3d.view_perspective == 'CAMERA'):
+        return []
+    frame = shared_frame(screen)
+    canvas = common.window_region(area)
+    width, height = canvas.width, canvas.height
+    right, bottom = _pixel(width / 2 + frame[2]), _pixel(height / 2 + frame[1])
+    strips = []
+    if width - right > SLIVER:
+        strips.append((right, 0, width, height))
+    if bottom > SLIVER:
+        strips.append((0, 0, min(right, width), bottom))
+    return strips
+
+
+def _shelf_tabs_pane():
+    """The sculpt half's brush shelf tabs as one pane, as the ZBrush look's colour theme draws them, where it does
+    not: Blender draws a backdrop behind the tabs alone, which leaves the shelf no straight top edge to match."""
+    from .zbrush_look import theme
+    if theme._pane_handle is None:
+        theme._draw_pane()
+
+
 def _draw_frame():
-    """Runs over each 3D viewport once it is drawn: dims what this half shows and the other does not."""
+    """Runs over each 3D viewport once it is drawn: dims what this half shows and the other does not, and with
+    Panes Under Panels the sculpt half beyond the frame they share."""
     context = bpy.context
     screen, area = context.screen, context.area
     if screen is None or area is None or not screen.get(MARK) or not context.scene.sculpt_kit_reference_frame:
         return
+    halves = _halves(screen)
+    if halves is not None and area == halves[1]:
+        _shelf_tabs_pane()
     strips = bands(screen, area)
+    strips += [strip for strip in panes(screen, area) if strip not in strips]
     if not strips:
         return
     canvas = common.window_region(area)
@@ -383,11 +495,11 @@ def _draw_frame():
     faces = [(i, i + 1, i + 2) for i in range(0, len(corners), 4)] + [(i, i + 2, i + 3) for i in range(0, len(corners), 4)]
     batch_for_shader(shader, 'TRIS', {"pos": corners}, indices=faces).draw(shader)
     ends = []
-    for x0, y0, x1, y1 in strips:  # along the side of each strip that faces the middle
+    for x0, y0, x1, y1 in strips:  # on the strip's own outermost pixels along the side that faces the middle
         if y0 == 0 and y1 == canvas.height:
-            ends += [(x1, y0), (x1, y1)] if x0 == 0 else [(x0, y0), (x0, y1)]
+            ends += [(x1 - 0.5, y0), (x1 - 0.5, y1)] if x0 == 0 else [(x0 + 0.5, y0), (x0 + 0.5, y1)]
         else:
-            ends += [(x0, y1), (x1, y1)] if y0 == 0 else [(x0, y0), (x1, y0)]
+            ends += [(x0, y1 - 0.5), (x1, y1 - 0.5)] if y0 == 0 else [(x0, y0 + 0.5), (x1, y0 + 0.5)]
     shader.uniform_float("color", EDGE)
     batch_for_shader(shader, 'LINES', {"pos": ends}).draw(shader)
     gpu.state.blend_set('NONE')
@@ -470,6 +582,8 @@ def _open(context, report):
     if not index:
         report({'ERROR'}, "The reference collection is not part of this scene")
         return {'CANCELLED'}
+    # Closing hid it by its eye in the Outliner; the reference half shows it again
+    next(layer for i, layer, _parent in numbered if i == index).hide_viewport = False
 
     # Split so that both canvases come out the same width: the panels that sit beside the sculpt's canvas
     # stay with the sculpt half, and the reference half has none.
@@ -492,6 +606,10 @@ def _open(context, report):
     reference_space.show_gizmo = False
     reference_space.show_region_ui = False
     reference_space.show_region_toolbar = False
+    # It was split off the sculpt's viewport and has its Color: Attribute or Texture would show a scan's own colour
+    # layers, which glow purple and yellow on Cast Hall's casts, and its blank bars leave no way to change it
+    if reference_space.shading.color_type in {'VERTEX', 'TEXTURE'}:
+        reference_space.shading.color_type = 'MATERIAL'
     # Under it, a brush shelf like the sculpt's wherever shelves take room from the canvas: the canvases are
     # then the same height, so the same point is at the same height on screen in both halves. A view cannot
     # be slid up or down inside its canvas instead without changing where it looks from. Shelves that float
@@ -505,8 +623,47 @@ def _open(context, report):
     screen[MARK] = True
     _halves_of[screen.as_pointer()] = (reference_area.as_pointer(), sculpt_area.as_pointer())
     _shown[screen.as_pointer()] = _view(sculpt_area.spaces.active)
-    _matcaps[screen.as_pointer()] = _matcap(sculpt_area)
+    _shadings[screen.as_pointer()] = _shading(sculpt_area)
     return {'FINISHED'}
+
+
+def _hide_reference(scene, view_layer):
+    """Once the halves are one ordinary viewport again, hide the reference by its eye in the Outliner, where
+    one click brings it back: the viewport goes on showing what the sculpt half showed. Shown, a reference
+    that stands where the sculpt does pokes through it, in its own colours when the viewport is in Attribute."""
+    reference = scene.sculpt_kit_reference
+    layer = next((layer for _i, layer, _parent in _layer_collections(view_layer) if layer.collection == reference), None)
+    if reference is not None and layer is not None:
+        layer.hide_viewport = True
+
+
+def _tidy_broken():
+    """Put back the half left of a reference view whose other half was closed with Blender's own Close Area rather
+    than the button: an ordinary viewport again, with the reference hidden by its eye (the reference half also gets
+    its overlays, gizmos and toolbar back), and the screen no longer marked as having the view open."""
+    for window in bpy.context.window_manager.windows:
+        screen = window.screen
+        if not screen.get(MARK) or _halves(screen) is not None:
+            continue
+        known = _halves_of.get(screen.as_pointer())
+        areas = _view3d_areas(screen)
+        if known:
+            left = [a for a in areas if a.as_pointer() in known]
+        else:  # after a file was loaded: the one viewport with collections of its own, if only one has them
+            left = [a for a in areas if a.spaces.active.use_local_collections]
+            left = left if len(left) == 1 else []
+        for area in left:
+            space = area.spaces.active
+            space.use_local_collections = False
+            if known and area.as_pointer() == known[0]:
+                space.overlay.show_overlays = True
+                space.show_gizmo = True
+                space.show_region_toolbar = True
+            area.tag_redraw()
+        if left:
+            _hide_reference(window.scene, window.view_layer)
+        _forget(screen)
+    return None
 
 
 def _close(context):
@@ -515,46 +672,7 @@ def _close(context):
     with context.temp_override(area=reference_area, region=common.window_region(reference_area)):
         bpy.ops.screen.area_close()
     sculpt_area.spaces.active.use_local_collections = False
-    _forget(screen)
-    return {'FINISHED'}
-
-
-# ------------------------------------------- views left open by earlier versions
-
-def _legacy_camera(space):
-    camera = space.camera if space.use_local_camera else None
-    return camera if camera is not None and camera.get(LEGACY_CAMERA) else None
-
-
-def _legacy_areas(screen):
-    return sorted((a for a in _view3d_areas(screen) if _legacy_camera(a.spaces.active)), key=lambda a: a.x)
-
-
-def _close_legacy(context):
-    """Close a reference view from a version that used a hidden camera: sculpt on the left, reference on the right."""
-    screen = context.screen  # read now: it is gone from the context once an area has been closed
-    sculpt_area, *others = _legacy_areas(screen)
-    space = sculpt_area.spaces.active
-    rv3d = space.region_3d
-    camera = _legacy_camera(space)
-    view = camera.matrix_world.inverted()
-    orthographic = camera.data.type == 'ORTHO'
-    ortho_distance = camera.data.ortho_scale * space.lens / 288.0  # how those versions sized the camera's frame
-
-    for area in others:
-        with context.temp_override(area=area, region=common.window_region(area)):
-            bpy.ops.screen.area_close()
-    space.lock_camera = False
-    rv3d.view_perspective = 'ORTHO' if orthographic else 'PERSP'
-    if orthographic:
-        rv3d.view_distance = ortho_distance
-    rv3d.view_matrix = view
-    space.use_local_camera = False
-    space.use_local_collections = False
-
-    data = camera.data
-    bpy.data.objects.remove(camera)
-    bpy.data.cameras.remove(data)
+    _hide_reference(context.scene, context.view_layer)
     _forget(screen)
     return {'FINISHED'}
 
@@ -571,10 +689,7 @@ class SCULPTKIT_OT_reference_view(bpy.types.Operator):
         return context.area is not None and context.area.type == 'VIEW_3D'
 
     def execute(self, context):
-        screen = context.screen
-        if _legacy_areas(screen):
-            return _close_legacy(context)
-        if is_open(screen):
+        if is_open(context.screen):
             return _close(context)
         return _open(context, self.report)
 
@@ -595,6 +710,9 @@ class SCULPTKIT_PT_reference_view(bpy.types.Panel):
         col.operator(SCULPTKIT_OT_reference_view.bl_idname, depress=opened, icon='WINDOW',
                      text="Close Reference View" if opened else "Open Reference View")
         col.prop(context.scene, "sculpt_kit_reference_frame")
+        sub = col.column()
+        sub.active = context.scene.sculpt_kit_reference_frame
+        sub.prop(context.scene, "sculpt_kit_reference_panes")
 
 
 _classes = (SCULPTKIT_OT_reference_view, SCULPTKIT_PT_reference_view)
@@ -609,6 +727,11 @@ def enable():
         name="Matching Edges", default=True, update=lambda _self, _context: common.redraw_all(),
         description="Dim what one half shows and the other does not. The edge of what stays bright is then the "
                     "same place in both: bring the reference up to it, then sculpt up to it")
+    bpy.types.Scene.sculpt_kit_reference_panes = BoolProperty(
+        name="Panes Under Panels", default=True, update=lambda _self, _context: common.redraw_all(),
+        description="With Matching Edges, shade the sculpt half too beyond the frame both halves share, down its "
+                    "right side and along its bottom, under the sidebar and brush shelf: the edges then run the full "
+                    "length in both halves")
     for cls in _classes:
         bpy.utils.register_class(cls)
     _blank_bars()
@@ -618,6 +741,8 @@ def enable():
 
 def disable():
     global _handle, _frame_handle
+    if bpy.app.timers.is_registered(_tidy_broken):
+        bpy.app.timers.unregister(_tidy_broken)
     for handle in (_handle, _frame_handle):
         if handle is not None:
             bpy.types.SpaceView3D.draw_handler_remove(handle, 'WINDOW')
@@ -625,5 +750,6 @@ def disable():
     _unblank_bars()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
+    del bpy.types.Scene.sculpt_kit_reference_panes
     del bpy.types.Scene.sculpt_kit_reference_frame
     del bpy.types.Scene.sculpt_kit_reference

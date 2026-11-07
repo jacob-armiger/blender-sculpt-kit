@@ -190,6 +190,31 @@ def test(sim):
     bars_bottom = min(r.y for r in right.regions if r.type in {'HEADER', 'TOOL_HEADER'}) - canvas.y
     sim.check("and along its top, where the sculpt's bars cover its canvas and the reference's blank ones do not",
               any(s[3] == hl and abs(s[1] - bars_bottom) <= 1 for s in strips(left)), (bars_bottom, strips(left)))
+    # The edges are worked out from the layout, not the colour theme: the same mark with Blender's own theme and the
+    # ZBrush style's (whose bars look solid)
+    for label, theme_on, style in (("with the colour theme off", False, 'KLAY'), ("in the ZBrush style", True, 'ZBRUSH')):
+        sim.prefs.look_theme = theme_on
+        sim.prefs.look_style = style
+        yield 1.0
+        left, right = sim.view3d_areas()
+        top = min(r.y for r in right.regions if r.type in {'HEADER', 'TOOL_HEADER'}) - sim.region(right).y
+        sim.check("the same mark along the top %s" % label, any(s[3] == size(left)[1] and abs(s[1] - top) <= 1
+                                                                 for s in strips(left)), (top, strips(left)))
+    sim.prefs.look_theme = True
+    sim.prefs.look_style = 'KLAY'
+    yield 1.0
+    left, right = sim.view3d_areas()
+    (wl, hl), (wr, hr) = size(left), size(right)
+    frame = module.shared_frame(screen())
+    # Panes Under Panels: the sculpt half shaded beyond the shared frame, under its sidebar and its shelf
+    panes = [tuple(round(v) for v in strip) for strip in module.panes(screen(), right)]
+    sim.check("Panes Under Panels shades the sculpt half under its sidebar, full height, and under its shelf, full width",
+              any(p[1] == 0 and p[3] == hr and p[2] == wr and p[0] < wr for p in panes)
+              and any(p[0] == 0 and p[1] == 0 and 0 < p[3] < hr for p in panes) and module.panes(screen(), left) == [],
+              panes)
+    scene.sculpt_kit_reference_panes = False
+    sim.check("and with the box off, the sculpt half is left as it was", module.panes(screen(), right) == [])
+    scene.sculpt_kit_reference_panes = True
     region = sim.region(left)
     spot = (region.x + (wl + round(wl / 2 + frame[2])) / 2, region.y + hl / 2)  # in that strip
     yield from sim.nudge(right)

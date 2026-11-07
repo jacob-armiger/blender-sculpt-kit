@@ -25,6 +25,9 @@ from .. import common
 # The view is left alone when it shows the new sphere between these sizes, as fractions of the viewport's shorter side.
 SMALLEST, LARGEST = 0.05, 1.0
 
+# Frame It: the share of the canvas's shorter side the new shape spans, seen from any side. Blender's View Selected
+# fills it edge to edge, which in the sculpt half of the reference view is far too close to work on.
+FRAMED = 0.5
 # A cube subdivided n times has 6 * 4^n faces: 6 gives about 25 thousand. Divide adds detail from there.
 LEVELS = 6
 # The cylinder's faces are about the size of the sphere's: its circumference is cut into this many.
@@ -188,6 +191,27 @@ def _in_view(context, location, radius):
     return 0.0 <= centre.x <= region.width and 0.0 <= centre.y <= region.height and SMALLEST <= across <= LARGEST
 
 
+def _reach(shape, radius, length, rounding):
+    """The radius of the sphere round the shape: how far its farthest point is from its middle."""
+    if shape == 'CYLINDER':
+        return max(radius, length / 2.0)
+    if shape == 'CUBE':  # a rounded corner: the inner box's corner, then the rounding beyond it
+        return radius * ((1.0 - rounding) * 3 ** 0.5 + rounding)
+    return radius
+
+
+def _frame(space, region, centre, reach):
+    """Bring the view to the new shape: centred on it, still looking from the same direction, and far enough back
+    that the sphere round it spans FRAMED of the canvas's shorter side. Worked out here rather than with View
+    Selected, which frames it edge to edge and needs Blender to have measured the new object first."""
+    rv3d = space.region_3d
+    if rv3d.view_perspective == 'CAMERA':
+        rv3d.view_perspective = 'PERSP'
+    half_view = common.view_tangent_per_pixel(space, region) * min(region.width, region.height) / 2
+    rv3d.view_location = centre
+    rv3d.view_distance = reach / (FRAMED * half_view)
+
+
 def _looking_at(context, shown):
     """The point in the middle of the viewport: on the surface that is there, or else as deep as the view's pivot."""
     region, rv3d = common.window_region(context.area), context.space_data.region_3d
@@ -227,33 +251,62 @@ One added to a sculpt goes where you are looking, and the view stays put"""
                                         "from a sharp cube at 0 to a sphere at 1")
     location: FloatVectorProperty(name="Location", subtype='TRANSLATION', options={'SKIP_SAVE'})
     frame: BoolProperty(name="Frame It", default=True, options={'SKIP_SAVE'},
-                        description="Move the view to the new sphere")
+                        description="Move the view to the new shape, keeping the direction it looks from")
     hide_cube: BoolProperty(name="Hide Starting Cube", default=True,
                             description="When Blender's starting cube is the only mesh on screen, "
-                                        "hide it and put the sphere in its place")
+                                        "hide it and put the new shape in its place")
     setup_view: BoolProperty(name="Set Up Viewport", default=True,
                              description="Matcap shading with cavity; hide the floor grid, axes and 3D cursor")
-    made: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})  # the object the last run of this press added
+    # True on a press, False once execute() has saved the step before the shape: a rerun from the corner panel
+    # keeps the run's own properties, so it finds False and does not save another
+    first_run: BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
+    # The shape the radius was worked out or typed for: a new shape picked in the corner panel starts at its own size
+    # (the cylinder's thin radius would make a sphere a tenth the size). Not an update callback on Shape: the
+    # sidebar's buttons set Shape each time it is drawn, and a callback there disturbs the window's drawing.
+    radius_for: StringProperty(options={'HIDDEN', 'SKIP_SAVE'})
+
+    def draw(self, _context):
+        # The corner panel shows only what the shape uses: Length is the cylinder's, Rounding the cube's.
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        col = layout.column()
+        col.prop(self, "shape")
+        col.prop(self, "triangles")
+        col.prop(self, "radius")
+        if self.shape == 'CYLINDER':
+            col.prop(self, "length")
+        elif self.shape == 'CUBE':
+            col.prop(self, "rounding")
+        col.prop(self, "location")
+        col = layout.column(heading="View")
+        col.prop(self, "frame")
+        col.prop(self, "hide_cube")
+        col.prop(self, "setup_view")
 
     def execute(self, context):
         from .zbrush_look import subtools
+        if context.mode == 'SCULPT' and self.first_run:
+            # Strokes are undone by Sculpt Mode's own steps, which cannot take back a new object: without a
+            # whole-file step here, undoing the shape does nothing for as many presses as there were strokes,
+            # then takes the shape and the strokes away together. A rerun from the corner panel would leave
+            # the shape too and add another. So a whole-file step goes here, with the strokes in the mesh
+            # (leaving Sculpt Mode writes them there) and in Sculpt Mode, where undoing should land.
+            bpy.ops.object.mode_set(mode='OBJECT')
+            bpy.ops.object.mode_set(mode='SCULPT')
+            bpy.ops.ed.undo_push(message="Before New Sculpt")
+        self.first_run = False
         if context.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
-        # Changing a setting in the corner panel runs this again, after Blender has undone the run before. When
-        # the step before that was a brush stroke, Blender's undo of the run does nothing and the shape it
-        # added is still here: every change would add another. So the last one is taken away here if it is.
-        stale = bpy.data.objects.get(self.made) if self.made else None
-        if stale is not None and stale == context.view_layer.objects.active and stale.type == 'MESH':
-            mesh = stale.data
-            bpy.data.objects.remove(stale)
-            if mesh.users == 0:
-                bpy.data.meshes.remove(mesh)
         space = _viewport(context)
         given = self.properties.is_property_set
 
+        if given("radius") and self.radius_for and self.radius_for != self.shape:
+            self.properties.property_unset("radius")
         if self.shape == 'CYLINDER' and not given("radius"):
             self.radius = 0.1
-        reach = max(self.radius, self.length / 2.0) if self.shape == 'CYLINDER' else self.radius
+        self.radius_for = self.shape
+        reach = _reach(self.shape, self.radius, self.length, self.rounding)
 
         shown = _on_screen(context)
         if self.hide_cube and len(shown) == 1 and _is_starting_cube(shown[0]):
@@ -275,7 +328,6 @@ One added to a sculpt goes where you are looking, and the view stays put"""
         name = next(label for value, label, _description in SHAPES if value == self.shape)  # named after its shape
         mesh.name = name
         ob = bpy.data.objects.new(name, mesh)
-        self.made = ob.name
         ob.location = self.location
         context.collection.objects.link(ob)
         for other in context.selected_objects:
@@ -290,8 +342,7 @@ One added to a sculpt goes where you are looking, and the view stays put"""
             if self.setup_view:
                 setup_view(space)
             if self.frame:
-                with context.temp_override(area=context.area, region=common.window_region(context.area)):
-                    bpy.ops.view3d.view_selected()
+                _frame(space, common.window_region(context.area), ob.location, reach)
         bpy.ops.object.mode_set(mode='SCULPT')
         return {'FINISHED'}
 

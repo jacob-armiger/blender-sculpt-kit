@@ -92,5 +92,23 @@ def test(sim):
               result == {'FINISHED'} and quads > 0.99 and 1500 < faces() < 4500 and bpy.context.mode == 'SCULPT',
               "%d faces, %.0f%% quads, %s" % (faces(), 100 * quads, bpy.context.mode))
 
+    # ------------------------------------------- a Resolution changed in the corner panel
+    def now():
+        return len(bpy.context.active_object.data.polygons)
+    scene.sculpt_kit_remesh_resolution = 96
+    yield from sim.key('R', ctrl=True)
+    yield 0.8
+    last = bpy.context.window_manager.operators[-1]
+    sim.check("the corner panel shows the resolution Ctrl + R used", last.properties.resolution == 96,
+              last.properties.resolution)
+    last.properties.resolution = 48
+    with sim.override():
+        bpy.ops.ed.undo_redo('EXEC_DEFAULT', True)  # what a change in the corner panel runs
+    yield 0.8
+    sim.check("a Resolution changed in the corner panel remeshes at it", near(now(), 48), now())
+    yield from sim.key('R', ctrl=True)
+    yield 0.8
+    sim.check("the next Ctrl + R goes back to the panel's resolution", near(now(), 96), now())
+
 
 simlib.run("sim_remesh", test)

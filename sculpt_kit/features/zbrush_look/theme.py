@@ -79,11 +79,12 @@ def wearing():
     return None
 
 
-def _take_off(style, prefs):
-    """Put back what the style changed: the saved values, or Blender's defaults where none were saved."""
+def _take_off(style, prefs, paths=None):
+    """Put back what the style changed (or only `paths` of it): the saved values, or Blender's defaults where none
+    were saved."""
     saved = json.loads(prefs.look_theme_backup) if prefs is not None and prefs.look_theme_backup else {}
     blender = data()["blender"]
-    _write({path: saved.get(path, blender[path]) for path in data()["styles"][style]})
+    _write({path: saved.get(path, blender[path]) for path in (data()["styles"][style] if paths is None else paths)})
     if prefs is not None:
         prefs.look_theme_backup = ""
 
@@ -155,4 +156,10 @@ def disable(restore=True):
     if worn is not None:
         _take_off(worn, prefs)
     elif prefs is not None:
-        prefs.look_theme_backup = ""  # the theme has been changed by hand since: nothing of ours is left to undo
+        # Most of the theme has been changed by hand since (or another theme picked): that stays. What still holds
+        # the style's value goes back, so that switching off never leaves some of the style behind.
+        values = data()["styles"].get(prefs.look_style, {})
+        ours = [path for path, value in values.items() if _in_place(path, value)]
+        if ours:
+            _take_off(prefs.look_style, prefs, ours)
+        prefs.look_theme_backup = ""

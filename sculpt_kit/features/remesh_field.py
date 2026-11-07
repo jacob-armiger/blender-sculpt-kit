@@ -39,6 +39,7 @@ SIZE_FIT = 0.05
 # The field follows curvature by share of the surface, so its pull against the (dimensionless) smoothing is the same
 # at any model size: a mesh of this area gets the pull of a vertex's area in mesh units, as the casts always did.
 ALIGN_AREA = 4.0
+SMALLEST_VOXEL = 1e-3  # the proxy's voxel at least: far above the 1.3e-5 Blender's voxel remesher refuses (make_proxy)
 CREASE_ANGLE = 60.0  # degrees: Detect Edges keeps the sculpt's edges folding more than this (sculpt_creases)
 CREASE_PAIR_REACH = 0.02  # quads: with Detect Edges, how near a +1/-1 pair of singularities is cancelled
 # Ridges (ridge_lines): how far the normal must turn across one quad (radians), and the shortest line kept (quads)
@@ -78,16 +79,35 @@ def make_proxy(ob, faces, context):
         return mesh
     area = np.empty(len(mesh.polygons), dtype=np.float32)
     mesh.polygons.foreach_get("area", area)
+    voxel = (1.4 * float(area.sum()) / faces) ** 0.5  # remesh.FACES_PER_VOXEL_AREA
+    if not voxel > 0.0:
+        bpy.data.meshes.remove(mesh)
+        raise RuntimeError("the mesh has no area to remesh")
+    # Blender's voxel remesher refuses a voxel under about 1.3e-5 whatever the model's size, which a sculpt under a
+    # centimetre or so across asks for: the copy is scaled up for the remesh and back down after it
+    scale = max(1.0, SMALLEST_VOXEL / voxel)
+    _scale(mesh, scale)
     temporary = bpy.data.objects.new("Sculpt Kit proxy", mesh)
     context.scene.collection.objects.link(temporary)
+    done = False
     try:
-        mesh.remesh_voxel_size = (1.4 * float(area.sum()) / faces) ** 0.5  # remesh.FACES_PER_VOXEL_AREA
+        mesh.remesh_voxel_size = voxel * scale
         mesh.use_remesh_preserve_attributes = False
         with context.temp_override(object=temporary, active_object=temporary, selected_objects=[temporary]):
             bpy.ops.object.voxel_remesh()
+        done = True
     finally:
         bpy.data.objects.remove(temporary)
+        if not done:  # nor is the copy left behind in the file
+            bpy.data.meshes.remove(mesh)
+    _scale(mesh, 1.0 / scale)
     return mesh
+
+
+def _scale(mesh, factor):
+    if factor != 1.0:
+        mesh.attributes["position"].data.foreach_set("vector", (coordinates(mesh) * factor).astype(np.float32).ravel())
+        mesh.update()
 
 
 def _corner_edges(mesh):

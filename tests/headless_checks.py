@@ -116,7 +116,7 @@ check("Ctrl + Alt unmasks", stroke_key(ctrl=True, alt=True) == {"brush_toggle": 
       stroke_key(ctrl=True, alt=True))
 check("Alt inverts the brush", stroke_key(alt=True) == {"brush_toggle": 'None', "mode": 'INVERT'}, stroke_key(alt=True))
 check("canvas gestures follow the mask stroke", has_key("sculptkit.canvas_mask", 'LEFTMOUSE', ctrl=True))
-for key, idname in (('S', "wm.radial_control"), ('U', "wm.radial_control"), ('F', "view3d.view_all"),
+for key, idname in (('S', "wm.radial_control"), ('U', "wm.radial_control"), ('F', "sculptkit.frame_sculpt"),
                     ('X', "wm.context_toggle"), ('P', "view3d.view_persportho"), ('SPACE', "wm.call_panel"),
                     ('B', "wm.call_asset_shelf_popover"), ('D', "object.subdivision_set")):
     check("hotkey %s" % key, has_key(idname, key))
@@ -203,6 +203,20 @@ preferences.system.use_region_overlap = False
 theme_module.enable()
 check("but with the same kit, what was changed by hand since stays", not preferences.system.use_region_overlap)
 preferences.system.use_region_overlap = True
+# On quit, Blender switches every add-on off through addon_utils.disable_all, and the look must then leave the
+# theme and workspace as they were saved; common.switching_all_addons_off recognises that call by its name
+common_module = importlib.import_module(MODULE + ".common")
+caller = {"__name__": "addon_utils", "common": common_module}
+exec("def disable_all():\n    return common.switching_all_addons_off()", caller)
+check("a quit is still recognised: Blender switches add-ons off through addon_utils.disable_all, as the look assumes",
+      callable(getattr(addon_utils, "disable_all", None)) and caller["disable_all"]()
+      and not common_module.switching_all_addons_off())
+header = preferences.themes[0].view_3d.space
+header.header = (0.141, 0.141, 0.141, 1.0)  # as kits before 0.6.2 left it: solid, so the canvas shrank beneath it
+prefs.look_theme_applied = "an older kit"
+theme_module.enable()
+check("the ZBrush style's header is a shade see-through, so it floats over the canvas, and an older kit's solid one "
+      "is replaced", 0.98 < header.header[3] < 0.995, round(header.header[3], 4))
 
 prefs.look_style = 'KLAY'
 check("the KlaySculpt style replaces it", theme.wearing() == 'KLAY' and in_place(klay), theme.wearing())
@@ -237,6 +251,12 @@ prefs.look_theme = True
 theme._write({path: blender[path] for path in zbrush})  # as if another theme had been picked in Preferences
 prefs.look_theme = False
 check("a theme picked by hand since is left as it is", in_place(blender, styled) and prefs.look_theme_backup == "")
+prefs.look_theme = True
+changed = sorted(zbrush)[: int(0.6 * len(zbrush))]  # most of it changed by hand, the rest still the style's
+theme._write({path: blender[path] for path in changed})
+prefs.look_theme = False
+check("with most of it changed by hand, what still holds the style goes back too", in_place(blender, styled)
+      and theme.wearing() is None and prefs.look_theme_backup == "")
 prefs.look_theme = True
 prefs.look_theme_backup = ""
 prefs.look_theme = False
@@ -359,10 +379,14 @@ check("the whole look is back", theme.wearing() == 'ZBRUSH' and all(registered(c
 check("the brush library is listed", kit_library in library_paths())
 prefs.use_kit_brushes = False
 check("and switches off", kit_library not in library_paths())
-bpy.context.preferences.filepaths.asset_libraries.new(name="Sculpt Kit Kingslien", directory=assets)
+own = bpy.context.preferences.filepaths.asset_libraries.new(name="Kingslien", directory=assets)  # one of the user's
 prefs.use_kit_brushes = True
-check("and back on, taking away the separate library of versions before 0.5", kit_library in library_paths()
-      and "Sculpt Kit Kingslien" not in [lib.name for lib in bpy.context.preferences.filepaths.asset_libraries])
+check("and back on, leaving the user's own libraries alone", kit_library in library_paths()
+      and "Kingslien" in [lib.name for lib in bpy.context.preferences.filepaths.asset_libraries])
+prefs.use_kit_brushes = False
+check("switching it off leaves them too", "Kingslien" in [lib.name for lib in bpy.context.preferences.filepaths.asset_libraries])
+bpy.context.preferences.filepaths.asset_libraries.remove(own)
+prefs.use_kit_brushes = True
 
 with bpy.data.libraries.load(os.path.join(kit_library, "SculptKit_Brushes.blend"), assets_only=True) as (src, dst):
     dst.brushes = list(src.brushes)
@@ -407,6 +431,22 @@ check("reference view switches off alone",
       and registered("SCULPTKIT_OT_new_sculpt"))
 prefs.use_reference_view = True
 check("reference view back on", registered("SCULPTKIT_OT_reference_view") and hasattr(bpy.types.Scene, "sculpt_kit_reference"))
+prefs.use_reference_view = False
+blender_header_draw = bpy.types.VIEW3D_HT_header.__dict__.get("draw")  # Blender's own, with the view switched off
+prefs.use_reference_view = True
+kit_header_draw = bpy.types.VIEW3D_HT_header.__dict__.get("draw")
+
+
+def wrapped_by_another_addon(self, context):
+    kit_header_draw(self, context)
+
+
+bpy.types.VIEW3D_HT_header.draw = wrapped_by_another_addon
+prefs.use_reference_view = False
+check("switching the reference view off keeps another add-on's wrapper of the header",
+      bpy.types.VIEW3D_HT_header.__dict__.get("draw") is wrapped_by_another_addon)
+bpy.types.VIEW3D_HT_header.draw = blender_header_draw  # as that add-on would, switched off in turn
+prefs.use_reference_view = True
 prefs.use_sculpt_session = False
 check("new sculpt switches off alone", not registered("SCULPTKIT_OT_new_sculpt") and registered("SCULPTKIT_OT_copy_brush_tuning"))
 prefs.use_sculpt_session = True
@@ -600,6 +640,20 @@ check("the panel's face estimate is within a fifth of what Voxel Remesh gives", 
       < 0.2 * len(monkey.data.polygons), (guess, len(monkey.data.polygons)))
 bpy.data.objects.remove(monkey)
 
+nothing = make_active("Nothing", bmesh.new())
+check("both remeshes refuse a mesh with no faces",
+      not bpy.ops.sculptkit.voxel_remesh.poll() and not bpy.ops.sculptkit.quad_remesh.poll())
+bpy.data.objects.remove(nothing)
+target = sphere(1.0)
+bpy.ops.object.mode_set(mode='SCULPT')
+bpy.ops.sculpt.dynamic_topology_toggle()
+check("with Dyntopo on, Voxel Remesh refuses (Blender's voxel remesher would) and fRemesher does not",
+      target.use_dynamic_topology_sculpting and not bpy.ops.sculptkit.voxel_remesh.poll()
+      and bpy.ops.sculptkit.quad_remesh.poll())
+bpy.ops.sculpt.dynamic_topology_toggle()
+bpy.ops.object.mode_set(mode='OBJECT')
+bpy.data.objects.remove(target)
+
 target = sphere(1.0)
 mask = target.data.attributes.new(".sculpt_mask", 'FLOAT', 'POINT')
 mask.data.foreach_set("value", [1.0 if v.co.x > 0.0 else 0.0 for v in target.data.vertices])
@@ -725,6 +779,19 @@ check("the corner panel is given the numbers and their typed forms",
       shown is not None and shown.target_faces == 2000 and shown.target_faces_text == "2,000"
       and shown.adaptive_size_text == "%.2f" % shown.adaptive_size,
       None if shown is None else (shown.target_faces, shown.target_faces_text, shown.adaptive_size_text))
+small = sphere(0.0005)
+small_result = bpy.ops.sculptkit.quad_remesh(use_symmetry=False, target_faces=1000)
+check("fRemesher remeshes a sculpt a millimetre across (Blender's voxel remesher refuses voxels that small)",
+      small_result == {'FINISHED'} and faces_near(small, 1000) and abs(max(small.dimensions) - 0.001) < 1e-4,
+      (small_result, len(small.data.polygons), tuple(small.dimensions)))
+bpy.data.objects.remove(small)
+displaced = sphere(1.0)
+displaced.modifiers.new("Displace", 'DISPLACE').strength = 0.2  # no texture: pushes the surface out 0.1
+bpy.ops.sculptkit.quad_remesh(use_symmetry=False, target_faces=1000)
+radius = float(np.linalg.norm(np.array([v.co[:] for v in displaced.data.vertices]), axis=1).mean())
+check("fRemesher snaps onto the mesh itself, not what its modifiers make of it, and leaves them on top",
+      abs(radius - 1.0) < 0.02 and len(displaced.modifiers) == 1 and displaced.modifiers[0].show_viewport, round(radius, 4))
+bpy.data.objects.remove(displaced)
 
 def failing_at(name, fail):
     """Run fRemesher on a sphere with a Decimate modifier while the named stage raises."""

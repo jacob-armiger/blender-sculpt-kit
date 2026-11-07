@@ -22,6 +22,17 @@ def shown(ob, space):
     return ob.evaluated_get(bpy.context.evaluated_depsgraph_get()).visible_in_viewport_get(space)
 
 
+def eye_closed(collection):
+    """Whether the collection is hidden by its eye in the Outliner."""
+    layers = [bpy.context.view_layer.layer_collection]
+    while layers:
+        layer = layers.pop()
+        if layer.collection == collection:
+            return layer.hide_viewport
+        layers.extend(layer.children)
+    return None
+
+
 def test(sim):
     module = importlib.import_module(simlib.MODULE + ".features.reference_view")
     for ob in list(bpy.data.objects):
@@ -117,33 +128,94 @@ def test(sim):
     sim.check("the picture did not jump when the view opened", close(sim.rv3d(right).view_matrix, view_before)
               and together(left, right))
     from bl_ext.user_default.sculpt_kit.features.zbrush_look import material
+    left_shading, right_shading = sim.space(left).shading, sim.space(right).shading
+    shading_before = module._shading(right)
+    key = sim.window.screen.as_pointer()
+
+    def step(area):
+        """Draw-time check on one half, then the sync it schedules for after the draw, run now."""
+        with sim.override(area):
+            module._keep_in_step()
+        if bpy.app.timers.is_registered(module._match_shading):
+            bpy.app.timers.unregister(module._match_shading)
+            module._match_shading()
+
+    def alike():
+        return module._shading(left) == module._shading(right)
+
     available = {light.name for light in bpy.context.preferences.studio_lights if light.type == 'MATCAP'}
     choices = [name for name in material.MATCAPS.values() if name in available]
     if len(choices) >= 2:
-        left_shading, right_shading = sim.space(left).shading, sim.space(right).shading
-        old_lighting = ((left_shading.light, left_shading.studio_light),
-                        (right_shading.light, right_shading.studio_light))
         first, second = choices[:2]
+        left_shading.type = right_shading.type = 'SOLID'
         left_shading.light = right_shading.light = 'MATCAP'
         left_shading.studio_light = right_shading.studio_light = first
-        module._matcaps[sim.window.screen.as_pointer()] = first
+        module._shadings[key] = module._shading(right)
         right_shading.studio_light = second
-        with sim.override(left):
-            module._keep_in_step()
+        step(left)
         sim.check("choosing a matcap in the sculpt half syncs it to the reference half",
                   left_shading.studio_light == second and right_shading.studio_light == second,
                   (left_shading.studio_light, right_shading.studio_light))
         left_shading.studio_light = first
-        with sim.override(right):
-            module._keep_in_step()
+        step(right)
         sim.check("choosing a matcap in the reference half syncs it to the sculpt half",
                   left_shading.studio_light == first and right_shading.studio_light == first,
                   (left_shading.studio_light, right_shading.studio_light))
-        left_shading.light, left_shading.studio_light = old_lighting[0]
-        right_shading.light, right_shading.studio_light = old_lighting[1]
-        module._matcaps[sim.window.screen.as_pointer()] = (
-            old_lighting[1][1] if old_lighting[0][0] == old_lighting[1][0] == 'MATCAP'
-            and old_lighting[0][1] == old_lighting[1][1] else None)
+
+        studios = [light.name for light in bpy.context.preferences.studio_lights if light.type == 'STUDIO']
+        right_shading.light = 'STUDIO'
+        step(left)
+        sim.check("switching the sculpt half to studio lighting switches the reference half",
+                  left_shading.light == 'STUDIO' and alike(), (left_shading.light, left_shading.studio_light))
+        if len(studios) >= 2:
+            other = next(name for name in studios if name != right_shading.studio_light)
+            right_shading.studio_light = other
+            right_shading.use_world_space_lighting = True
+            right_shading.studiolight_rotate_z = 0.7
+            step(left)
+            sim.check("and the studio light picked, its rotation and world-space lighting follow",
+                      left_shading.studio_light == other and left_shading.use_world_space_lighting
+                      and abs(left_shading.studiolight_rotate_z - 0.7) < 1e-4,
+                      (left_shading.studio_light, left_shading.studiolight_rotate_z))
+            left_shading.studio_light = studios[0] if studios[0] != other else studios[1]
+            step(right)
+            sim.check("choosing a studio light in the reference half syncs it to the sculpt half",
+                      right_shading.studio_light == left_shading.studio_light, right_shading.studio_light)
+
+        # The rest of the Shading popover, changed in both halves at once: each change reaches the other half.
+        right_shading.show_cavity, right_shading.cavity_type = True, 'BOTH'
+        right_shading.cavity_ridge_factor = 1.7
+        right_shading.background_type, right_shading.background_color = 'VIEWPORT', (0.1, 0.1, 0.3)
+        left_shading.color_type, right_shading.color_type = 'MATERIAL', 'VERTEX'
+        left_shading.show_shadows, left_shading.shadow_intensity = True, 0.3
+        left_shading.show_specular_highlight = not right_shading.show_specular_highlight
+        step(left)
+        sim.check("cavity and background set in the sculpt half, shadows and specular in the reference half, all "
+                  "reach both", alike() and left_shading.show_cavity and abs(left_shading.cavity_ridge_factor - 1.7) < 1e-4
+                  and left_shading.background_type == 'VIEWPORT' and right_shading.show_shadows
+                  and abs(right_shading.shadow_intensity - 0.3) < 1e-4,
+                  [n for n, a, b in zip(module._shading_settings(), module._shading(left), module._shading(right))
+                   if a != b])
+        sim.check("but each half keeps its own object colour", left_shading.color_type == 'MATERIAL'
+                  and right_shading.color_type == 'VERTEX', (left_shading.color_type, right_shading.color_type))
+
+        right_shading.type = 'MATERIAL'
+        right_shading.studiolight_intensity = 1.6
+        right_shading.studiolight_background_alpha = 0.4
+        step(left)
+        sim.check("Material Preview, with its light's strength and the world's opacity, follows too",
+                  left_shading.type == 'MATERIAL' and abs(left_shading.studiolight_intensity - 1.6) < 1e-4
+                  and abs(left_shading.studiolight_background_alpha - 0.4) < 1e-4 and alike(),
+                  (left_shading.type, left_shading.studiolight_intensity))
+        left_shading.type = 'SOLID'
+        left_shading.light = 'MATCAP'
+        step(right)
+        sim.check("going back to Solid and a matcap in either half brings the other back to it",
+                  right_shading.type == 'SOLID' and right_shading.light == 'MATCAP' and alike(),
+                  (right_shading.type, right_shading.light))
+        for area in (left, right):
+            module._shade(area, shading_before)
+        module._shadings[key] = shading_before
     sim.check("no helper objects were added", not [ob for ob in bpy.data.objects if ob.type == 'CAMERA'],
               [ob.name for ob in bpy.data.objects])
     sim.screenshot("reference_view_open.png")
@@ -242,34 +314,48 @@ def test(sim):
     sim.check("it is an ordinary view again", not space.use_local_collections and not module.is_open(sim.window.screen)
               and "sculpt_kit_reference_view" not in sim.window.screen)
     sim.check("the picture did not jump when the view closed", close(rv3d.view_matrix, view_expected))
-    sim.check("the sculpt and the reference are both visible again", shown(sculpt_ob, space) and shown(cube, space))
+    sim.check("the viewport goes on showing the sculpt without the reference, which its eye hides",
+              shown(sculpt_ob, space) and not shown(cube, space) and eye_closed(cube.users_collection[0]))
     sim.screenshot("reference_view_closed.png")
 
-    # ---------------------------- a view left open by a version that used a camera
+    # ------------------------------------ the reference half closed with Blender's own Close Area
     with sim.override():
-        bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
-    yield 0.5
-    data = bpy.data.cameras.new("SculptKit Reference Camera")
-    camera = bpy.data.objects.new("SculptKit Reference Camera", data)
-    camera["sculpt_kit_reference_camera"] = True
-    scene.collection.objects.link(camera)
-    camera.matrix_world = sim.rv3d().view_matrix.inverted()
-    for area in sim.view3d_areas():
-        space = sim.space(area)
-        space.use_local_camera = True
-        space.camera = camera
-        space.lock_camera = True
-        sim.rv3d(area).view_perspective = 'CAMERA'
-    yield 0.5
-    sim.check("an old camera-based view counts as open", module.is_open(sim.window.screen))
-    with sim.override(sim.view3d_areas()[0]):
         bpy.ops.sculptkit.reference_view()
+    yield 1.0
+    left, right = sim.view3d_areas()
+    with sim.override(left):
+        bpy.ops.screen.area_close()
     yield 1.0
     areas = sim.view3d_areas()
     space = sim.space()
-    sim.check("and the button tidies it away", len(areas) == 1 and sim.rv3d().view_perspective != 'CAMERA'
-              and not space.use_local_camera and not space.lock_camera
-              and not [ob for ob in bpy.data.objects if ob.type == 'CAMERA'], len(areas))
+    sim.check("closing the reference half by hand leaves an ordinary viewport, the reference hidden by its eye",
+              len(areas) == 1 and not space.use_local_collections and "sculpt_kit_reference_view" not in sim.window.screen
+              and shown(sculpt_ob, space) and not shown(cube, space) and eye_closed(cube.users_collection[0]),
+              (len(areas), space.use_local_collections))
+    with sim.override():
+        bpy.ops.sculptkit.reference_view()
+    yield 1.0
+    left, right = sim.view3d_areas()
+    sim.check("and the button opens the view again, the reference showing in its half and not the sculpt's",
+              module.is_open(sim.window.screen) and shown(cube, sim.space(left)) and not shown(cube, sim.space(right))
+              and shown(sculpt_ob, sim.space(right)) and not eye_closed(cube.users_collection[0]))
+    with sim.override(sim.view3d_areas()[1]):
+        bpy.ops.sculptkit.reference_view()
+    yield 1.0
+
+    # ------------------------------ a sculpt shown by Attribute colour does not colour the reference
+    sim.space().shading.color_type = 'VERTEX'
+    with sim.override():
+        bpy.ops.sculptkit.reference_view()
+    yield 1.0
+    left, right = sim.view3d_areas()
+    sim.check("with the sculpt in Attribute colour, the reference half opens in Material and the sculpt stays as it was",
+              sim.space(left).shading.color_type == 'MATERIAL' and sim.space(right).shading.color_type == 'VERTEX',
+              (sim.space(left).shading.color_type, sim.space(right).shading.color_type))
+    with sim.override(right):
+        bpy.ops.sculptkit.reference_view()
+    yield 1.0
+    sim.space().shading.color_type = 'MATERIAL'
 
 
 simlib.run("sim_reference_view", test)

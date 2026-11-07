@@ -96,8 +96,11 @@ def test(sim):
               (on_screen(), active()))
 
     # ------------------------- changing a setting in the corner panel, after a stroke
+    unstroked = sim.positions(bpy.data.objects[first]).copy()
     centre = sim.project((0.0, 0.0, 0.0))
     yield from sim.drag(centre, (centre[0] + 30, centre[1] + 12))
+    stroked = sim.positions(bpy.data.objects[first]).copy()
+    without_cube = meshes()
     sim.call(bpy.ops.sculptkit.new_sculpt, shape='CUBE')
     yield 1.0
     count = len(meshes())
@@ -111,9 +114,13 @@ def test(sim):
     sim.check("changing the cube's settings in the corner panel changes that cube and adds no more",
               len(meshes()) == count and abs(farthest - (0.4 * 3 ** 0.5 + 0.6)) < 1e-3 and bpy.context.mode == 'SCULPT',
               (len(meshes()), count, round(farthest, 4)))
-    with sim.override():
-        bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.data.objects.remove(changed)
+    yield from sim.undo()
+    sim.check("one undo takes the cube away and keeps the stroke made before it, in Sculpt Mode",
+              meshes() == without_cube and active() == (first, 'SCULPT')
+              and close(sim.positions(bpy.data.objects[first]), stroked), (meshes(), active()))
+    yield from sim.undo()  # the step saved before the cube and the stroke are the same state
+    yield from sim.undo()
+    sim.check("two more presses take the stroke back", close(sim.positions(bpy.data.objects[first]), unstroked))
     first_ob = bpy.data.objects[first]
     first_ob.select_set(True)
     bpy.context.view_layer.objects.active = first_ob
@@ -226,6 +233,10 @@ def test(sim):
               and bpy.context.mode == 'SCULPT', bpy.data.objects[was].visible_get())
 
     # ---------------------------------------------------- cubes that stay put
+    # Closing the reference view above hid the Reference collection by its eye: show it again for the cube
+    for layer in bpy.context.view_layer.layer_collection.children:
+        if layer.collection == reference:
+            layer.hide_viewport = False
     only("RefCube")
     look((0.0, 0.0, 0.0), 20.0)
     yield 0.5
@@ -242,6 +253,22 @@ def test(sim):
     sim.check("with Hide Starting Cube off, Blender's cube stays and the sphere is added to it",
               bpy.data.objects["Cube"].visible_get() and abs(max(abs(v) for v in sphere.location) - 1.0) < 0.01
               and in_the_middle(sphere), tuple(sphere.location))
+
+    # ------------------------------------- a cylinder, and a new shape picked in the corner panel
+    sim.call(bpy.ops.sculptkit.new_sculpt, shape='CYLINDER')
+    yield 1.0
+    cylinder = bpy.context.active_object
+    sim.check("a cylinder starts thin: 0.2 across, 2 tall", abs(cylinder.dimensions.x - 0.2) < 1e-3
+              and abs(cylinder.dimensions.z - 2.0) < 1e-3, tuple(cylinder.dimensions))
+    for shape, across_wanted in (('SPHERE', 2.0), ('CYLINDER', 0.2)):
+        bpy.context.window_manager.operators[-1].properties.shape = shape
+        with sim.override():
+            bpy.ops.ed.undo_redo('EXEC_DEFAULT', True)  # what a change in the corner panel runs
+        yield 1.0
+        made = bpy.context.active_object
+        sim.check("Shape changed to %s in the corner panel starts at that shape's own size" % shape.lower(),
+                  made.name.startswith(shape.title()) and abs(made.dimensions.x - across_wanted) < 1e-3,
+                  (made.name, tuple(made.dimensions)))
 
 
 simlib.run("sim_new_sculpt", test)

@@ -110,9 +110,18 @@ class _Sculpt:
     edges (as their vertices and midpoints, dense on a sculpt), so the new open edges land on the old ones
     rather than anywhere on the surface near them."""
 
-    def __init__(self, ob, depsgraph):
+    def __init__(self, ob, _depsgraph=None):  # the depsgraph is read afresh below; the lab's scripts still pass one
         from mathutils.kdtree import KDTree
-        self.surface = BVHTree.FromObject(ob, depsgraph)
+        # The mesh itself, without its modifiers: the remesh replaces the mesh and leaves the modifiers on top, so
+        # snapping onto a Mirror's whole, a Displace's or a Shrinkwrap's surface would put them in twice
+        on = [m for m in ob.modifiers if m.show_viewport]
+        for m in on:
+            m.show_viewport = False
+        try:
+            self.surface = BVHTree.FromObject(ob, bpy.context.evaluated_depsgraph_get())
+        finally:
+            for m in on:
+                m.show_viewport = True
         self.rim = None
         mesh = ob.data
         if len(mesh.edges):
@@ -213,12 +222,33 @@ def _has_multires(ob):
     return any(m.type == 'MULTIRES' for m in ob.modifiers)
 
 
-def _can_remesh(cls, context):
+def _blocked(ob, dyntopo=False):
+    """Why the remeshers cannot run on this mesh, or None. With dyntopo, Dyntopo counts too: Blender's voxel
+    remesher, which Voxel Remesh runs, refuses a mesh while it is on (fRemesher leaves it and works)."""
+    if _has_multires(ob):  # Blender's remeshers refuse a mesh with Multires levels
+        return "Apply or remove the Multires levels first"
+    if not len(ob.data.polygons):
+        return "The mesh has no faces to remesh"
+    if dyntopo and ob.mode == 'SCULPT' and ob.use_dynamic_topology_sculpting:
+        return "Turn Dyntopo off first"
+    return None
+
+
+def _symmetry_hint(layout, ob, wanted):
+    """Under a Use Mesh Symmetry that is on: a note when the mesh has no symmetry axis on, so the box does nothing.
+    The axes are the X, Y and Z in Sculpt Mode's header."""
+    mesh = ob.data if ob is not None and ob.type == 'MESH' else None
+    if wanted and mesh is not None and not (mesh.use_mirror_x or mesh.use_mirror_y or mesh.use_mirror_z):
+        common.info(layout, "No symmetry axis is on for this mesh")
+
+
+def _can_remesh(cls, context, dyntopo=False):
     ob = context.active_object
     if ob is None or ob.type != 'MESH' or context.mode not in {'OBJECT', 'SCULPT'}:
         return False
-    if _has_multires(ob):  # Blender's remeshers refuse a mesh with Multires levels
-        cls.poll_message_set("Apply or remove the Multires levels first")
+    reason = _blocked(ob, dyntopo)
+    if reason is not None:
+        cls.poll_message_set(reason)
         return False
     return True
 
@@ -231,13 +261,15 @@ class SCULPTKIT_OT_voxel_remesh(bpy.types.Operator):
     bl_label = "Voxel Remesh"
     bl_options = {'REGISTER', 'UNDO'}
 
-    resolution: IntProperty(name="Resolution", default=0, min=0, max=4096,
+    # Starts afresh on every press (SKIP_SAVE), as fRemesher's Faces does: remembered, a value changed in the corner
+    # panel would override the Sculpt Kit panel's from then on. execute() writes back the value used.
+    resolution: IntProperty(name="Resolution", default=0, min=0, max=4096, options={'SKIP_SAVE'},
                             description="Voxels along the model's longest side. 0 uses the value in the Sculpt Kit panel")
     keep_attributes: BoolProperty(name="Keep Mask and Face Sets", default=True)
 
     @classmethod
     def poll(cls, context):
-        return _can_remesh(cls, context)
+        return _can_remesh(cls, context, dyntopo=True)
 
     def execute(self, context):
         mesh = context.active_object.data
@@ -247,6 +279,7 @@ class SCULPTKIT_OT_voxel_remesh(bpy.types.Operator):
         if longest_side <= 0.0:
             return {'CANCELLED'}
         resolution = self.resolution or context.scene.sculpt_kit_remesh_resolution
+        self.resolution = resolution  # the corner panel shows what was used, and a rerun keeps it
         mesh.remesh_voxel_size = longest_side / resolution
         mesh.use_remesh_preserve_attributes = self.keep_attributes
         if 'FINISHED' not in bpy.ops.object.voxel_remesh():
@@ -259,7 +292,7 @@ class SCULPTKIT_OT_voxel_remesh(bpy.types.Operator):
 # Faces a voxel remesh gives per (surface area / voxel size squared): measured on a sphere, a subdivided
 # Suzanne and a thin cylinder (1.3 to 1.5); flat-sided shapes give about 1.0. Sculpts are mostly curved.
 FACES_PER_VOXEL_AREA = 1.4
-_measured = {}  # mesh pointer -> (vertex count, face count, when, surface area, longest side)
+_measured = {}  # mesh session_uid -> (vertex count, face count, when, surface area, longest side)
 
 
 def _measure(mesh):
@@ -267,7 +300,7 @@ def _measure(mesh):
     and the panel is drawn often, so they are worked out again only when the mesh gains or loses faces (a remesh,
     Divide, Dyntopo), and then no more than every few seconds. Sculpting alone changes them too little to matter."""
     import time
-    key, now = mesh.as_pointer(), time.monotonic()
+    key, now = mesh.session_uid, time.monotonic()  # not the pointer: a new mesh can be given a freed one
     known = _measured.get(key)
     if known and (known[:2] == (len(mesh.vertices), len(mesh.polygons)) or now - known[2] < 3.0):
         return known[3:]
@@ -275,6 +308,8 @@ def _measure(mesh):
     mesh.polygons.foreach_get("area", area)
     co = _coordinates(mesh)
     measured = (float(area.sum()), float(np.ptp(co, axis=0).max()) if len(co) else 0.0)
+    if len(_measured) > 64:  # meshes come and go (each remesh makes a new one): keep the dict small
+        _measured.clear()
     _measured[key] = (len(mesh.vertices), len(mesh.polygons), now) + measured
     return measured
 
@@ -805,6 +840,9 @@ back onto it"""
     follow_ridges: BoolProperty(name="Follow Ridges", default=False, options={'SKIP_SAVE'},
                                 description="Run edge loops along the sculpt's ridges and "
                                             "valleys, such as a nose, brow or lips, so flat shading shows the forms")
+    # True on a press, False once execute() has saved the step before the remesh: a rerun from the corner panel
+    # keeps the run's own properties, so it finds False and does not save another (see execute)
+    first_run: BoolProperty(default=True, options={'HIDDEN', 'SKIP_SAVE'})
     detect_edges: BoolProperty(name="Detect Edges", default=True, options={'SKIP_SAVE'},
                                description="Lay edge loops along the sculpt's hard edges, such as "
                                            "a plinth's or an armour plate's, so they stay crisp")
@@ -825,6 +863,7 @@ back onto it"""
             col = layout.column(heading="Shape")
             col.prop(self, "preserve_sharp")
             col.prop(self, "use_symmetry")
+            _symmetry_hint(col, context.active_object, self.use_symmetry)
             layout.separator()
             col = layout.column()
             col.prop(self, "smoothing")
@@ -840,6 +879,7 @@ back onto it"""
         col.prop(self, "detect_edges")
         col.prop(self, "follow_ridges")
         col.prop(self, "use_symmetry")
+        _symmetry_hint(col, context.active_object, self.use_symmetry)
         layout.separator()
         col = layout.column()
         col.prop(self, "smoothing")
@@ -901,22 +941,25 @@ back onto it"""
                 self.adaptive_auto = False
         self._typed("adaptive_size", 0.0, 1.0, False, notes)
         sharp, field_engine = self.preserve_sharp, _field_engine()
-        if ob.mode == 'SCULPT' and not self.is_repeat():
+        if ob.mode == 'SCULPT' and self.first_run:
             # Strokes are undone by Sculpt Mode's own steps, which cannot be replayed onto a mesh with other
             # vertices: without a step here, undoing the remesh stays put, then falls back past every stroke
             # to the last whole-file step. So a whole-file step goes here, with the strokes in the mesh (leaving
             # Sculpt Mode writes them there) and in Sculpt Mode, where undoing should land. A rerun from the
-            # corner panel already has this step behind it.
+            # corner panel already has this step behind it. Not is_repeat(): that only asks whether the last
+            # registered operator was this one, which strokes (never registered) leave true for a second press,
+            # and which a rerun (compared with the operator before it) finds false.
             bpy.ops.object.mode_set(mode='OBJECT')
             bpy.ops.object.mode_set(mode='SCULPT')
             bpy.ops.ed.undo_push(message="Before fRemesher")
+        self.first_run = False
         with common.object_mode(context):
             original = ob.data
             lost = _not_carried(ob)
             shown = _unhide_result(ob)  # before reading the sculpt, which a viewport Decimate would thin out
             work = None
             try:
-                surface = _Sculpt(ob, context.evaluated_depsgraph_get())  # the sculpt, to snap back onto
+                surface = _Sculpt(ob)  # the sculpt, to snap back onto
                 closed = _open_edges(original) == 0
                 result, repairs, holes, unfolded, rebuilt, pinches = {'CANCELLED'}, {}, False, 0, 0, 0
                 asymmetric, ridges = False, None
@@ -1027,8 +1070,9 @@ class SCULPTKIT_PT_remesh(bpy.types.Panel):
         return ob is not None and ob.type == 'MESH'
 
     def draw(self, context):
-        if _has_multires(context.active_object):
-            common.info(self.layout.column(), "Apply or remove Multires first", icon='INFO')
+        reason = _blocked(context.active_object)
+        if reason is not None:
+            common.info(self.layout.column(), reason, icon='INFO')
 
 
 class _RemeshPart:
@@ -1056,12 +1100,14 @@ class SCULPTKIT_PT_remesh_voxel(_RemeshPart, bpy.types.Panel):
 
     def draw(self, context):
         scene, ob = context.scene, context.active_object
-        blocked = _has_multires(ob)
+        blocked = _blocked(ob, dyntopo=True)
         col = self.layout.column()
-        row = _action_row(col, not blocked)
+        if blocked is not None and _blocked(ob) is None:  # Dyntopo: the panel above says the rest
+            common.info(col, blocked, icon='INFO')
+        row = _action_row(col, blocked is None)
         row.prop(scene, "sculpt_kit_remesh_resolution", text="Resolution")
         row.operator(SCULPTKIT_OT_voxel_remesh.bl_idname, text="Remesh")
-        faces = None if blocked else estimate_faces(ob.data, scene.sculpt_kit_remesh_resolution)
+        faces = None if blocked is not None else estimate_faces(ob.data, scene.sculpt_kit_remesh_resolution)
         if faces is not None:
             now = len(ob.data.polygons)
             common.info(col, "%s → about %s faces" % (common.face_count(now), common.face_count(faces)))
@@ -1074,7 +1120,7 @@ class SCULPTKIT_PT_remesh_quads(_RemeshPart, bpy.types.Panel):
 
     def draw(self, context):
         scene, ob = context.scene, context.active_object
-        blocked = _has_multires(ob)
+        blocked = _blocked(ob) is not None
         layout = self.layout
         row = _action_row(layout, not blocked)
         row.prop(scene, "sculpt_kit_quad_faces", text="Faces")
@@ -1110,8 +1156,9 @@ class SCULPTKIT_PT_remesh_quads_advanced(_RemeshPart, bpy.types.Panel):
         col = self.layout.column(heading="Result")
         col.use_property_split = True
         col.use_property_decorate = False
-        col.enabled = not _has_multires(context.active_object)
+        col.enabled = _blocked(context.active_object) is None
         col.prop(scene, "sculpt_kit_quad_symmetry")
+        _symmetry_hint(col, context.active_object, scene.sculpt_kit_quad_symmetry)
         if _field_engine():  # fRemesher's own step: the QuadriFlow stand-in has no fit, as the corner panel shows
             col.prop(scene, "sculpt_kit_quad_fit")
         col.prop(scene, "sculpt_kit_quad_pinches")

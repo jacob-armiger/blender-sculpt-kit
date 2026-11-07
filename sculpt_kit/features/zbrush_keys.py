@@ -12,6 +12,7 @@ to the next binding for that key, which is the navigation operator.
 import bpy
 import numpy as np
 from bpy.props import BoolProperty, EnumProperty
+from mathutils import Vector
 
 from .. import common
 from . import subdivide
@@ -40,7 +41,7 @@ CHEAT_SHEET = (
     )),
     ("keys_hotkeys", (
         "S brush size, U strength",
-        "F frame, Shift + F wireframe, P perspective",
+        "F frame the sculpt, Shift + F wireframe, P perspective",
         "X symmetry, B brush picker",
         "D / Shift + D subdivision level up / down, Ctrl + D divide",
     )),
@@ -66,6 +67,53 @@ class SCULPTKIT_OT_canvas_navigate(bpy.types.Operator):
     def invoke(self, _context, _event):
         navigate = {'ROTATE': bpy.ops.view3d.rotate, 'MOVE': bpy.ops.view3d.move, 'ZOOM': bpy.ops.view3d.zoom}
         navigate[self.action]('INVOKE_DEFAULT')
+        return {'FINISHED'}
+
+
+# Frame Sculpt: the share of the visible canvas the sculpt is fitted to, so that it comes to around its edges
+FRAME_FILL = 0.9
+
+
+class SCULPTKIT_OT_frame_sculpt(bpy.types.Operator):
+    """Fit the sculpt you are working on to the viewport, to around its edges, from the direction the view looks
+from (F)"""
+    bl_idname = "sculptkit.frame_sculpt"
+    bl_label = "Frame Sculpt"
+
+    @classmethod
+    def poll(cls, context):
+        return context.area is not None and context.area.type == 'VIEW_3D' and context.active_object is not None
+
+    def execute(self, context):
+        from .reference_view import visible_part
+        ob, space = context.active_object, context.space_data
+        rv3d, region = space.region_3d, common.window_region(context.area)
+        left, bottom, right, top = visible_part(context.area)
+        if rv3d.view_perspective == 'CAMERA':
+            rv3d.view_perspective = 'PERSP'
+        # The sculpt's own surface, not its box (a sphere's box reaches well past its outline): a sample of its
+        # vertices, in the view's axes (x right, y up, z towards the eye) from the middle of its box
+        mesh = ob.data
+        co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
+        mesh.attributes["position"].data.foreach_get("vector", co)
+        co = co.reshape(-1, 3)[::max(1, len(mesh.vertices) // 200_000)].astype(np.float64)
+        if not len(co):
+            return {'CANCELLED'}
+        world = np.array(ob.matrix_world)
+        co = co @ world[:3, :3].T + world[:3, 3]
+        centre = Vector(((co.min(axis=0) + co.max(axis=0)) / 2).tolist())
+        turn = np.array(rv3d.view_rotation.inverted().to_matrix())
+        points = (co - np.array(centre)) @ turn.T
+        # Centred on the sculpt, so that the view turns about it, and as large as the canvas that no panel hides
+        # (FRAME_FILL of its width and height): as tangents of the view's angle
+        room = FRAME_FILL * common.view_tangent_per_pixel(space, region)
+        x, y, z = points[:, 0], points[:, 1], points[:, 2]
+        reach = np.maximum(np.abs(x) / (room * max((right - left) / 2, 1.0)),
+                           np.abs(y) / (room * max((top - bottom) / 2, 1.0)))
+        # in perspective each point's distance from the eye counts, the near ones most
+        distance = float((reach + z).max() if rv3d.is_perspective else reach.max())
+        rv3d.view_location = centre
+        rv3d.view_distance = max(distance, 1e-4)
         return {'FINISHED'}
 
 
@@ -165,7 +213,7 @@ class SCULPTKIT_OT_canvas_mask(bpy.types.Operator):
             bpy.ops.paint.mask_flood_fill(mode='INVERT')
             return
         if _box_misses_model(context, xmin, xmax, ymin, ymax):
-            if _canvas_drag_remeshes() and not _has_mask(context.active_object):
+            if _canvas_drag_remeshes() and not _has_mask(context.active_object) and bpy.ops.sculptkit.voxel_remesh.poll():
                 bpy.ops.sculptkit.voxel_remesh()  # ZBrush's DynaMesh gesture
             else:
                 bpy.ops.paint.mask_flood_fill(mode='VALUE', value=0.0)
@@ -174,7 +222,7 @@ class SCULPTKIT_OT_canvas_mask(bpy.types.Operator):
                                            mode='VALUE', value=0.0 if self.unmask else 1.0)
 
 
-_classes = (SCULPTKIT_OT_canvas_navigate, SCULPTKIT_OT_canvas_mask)  # Ctrl + D's Divide lives in subdivide.py
+_classes = (SCULPTKIT_OT_canvas_navigate, SCULPTKIT_OT_canvas_mask, SCULPTKIT_OT_frame_sculpt)  # Ctrl + D's Divide lives in subdivide.py
 
 
 # --------------------------------------------------------------------- keymap
@@ -247,7 +295,7 @@ def _entries(prefs):
         entries += [
             ("wm.radial_control", 'S', "", _radial("size", "use_unified_size")),
             ("wm.radial_control", 'U', "", _radial("strength", "use_unified_strength")),
-            ("view3d.view_all", 'F', "", {}),
+            ("sculptkit.frame_sculpt", 'F', "", {}),
             ("wm.context_toggle", 'F', "shift", {"data_path": "space_data.overlay.show_wireframes"}),
             ("view3d.view_persportho", 'P', "", {}),
             ("wm.context_toggle", 'X', "", {"data_path": "object.data.use_mirror_x"}),

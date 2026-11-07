@@ -64,8 +64,8 @@ class SCULPTKIT_OT_watch_modifiers(bpy.types.Operator):
 
 
 def _shelf(self, context):
-    paint = context.tool_settings.sculpt
-    brush = paint.brush
+    paint = context.tool_settings.sculpt  # None in a file that has never been in Sculpt Mode
+    brush = paint.brush if paint is not None else None
     if brush is None or not common.brush_tool_active(context):
         _blender_draw(self, context)
         return

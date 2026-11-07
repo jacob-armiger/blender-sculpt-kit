@@ -1,4 +1,5 @@
 """Interactive test: ZBrush navigation, modifiers and hotkeys do what the preferences say."""
+import importlib
 import os
 import sys
 
@@ -93,6 +94,30 @@ def test(sim):
     yield from sim.key('F')
     yield 0.6
     sim.check("F frames the model again", sim.changes(s)["zoomed"])
+
+    def fit():
+        """How large the sculpt is against the canvas that no panel hides: the largest share of its half width or
+        half height that the sculpt reaches from the view's middle (1 = as large as it)."""
+        from mathutils import Vector
+        from bpy_extras import view3d_utils
+        visible = importlib.import_module(simlib.MODULE + ".features.reference_view").visible_part(sim.area)
+        ob, region = bpy.context.active_object, sim.region()
+        share = 0.0
+        vertices = ob.data.vertices
+        for i in range(0, len(vertices), 25):  # the sculpt's own outline
+            p = view3d_utils.location_3d_to_region_2d(region, sim.rv3d(), ob.matrix_world @ vertices[i].co)
+            dx, dy = p.x - region.width / 2, p.y - region.height / 2
+            share = max(share, abs(dx) / ((visible[2] - visible[0]) / 2), abs(dy) / ((visible[3] - visible[1]) / 2))
+        return share
+
+    sim.check("F fits the sculpt to around the edges of the visible canvas", 0.87 < fit() <= 0.91, round(fit(), 3))
+    yield from sim.key('P')
+    yield 0.3
+    yield from sim.key('F')
+    yield 0.6
+    sim.check("in orthographic too", 0.87 < fit() <= 0.91, round(fit(), 3))
+    yield from sim.key('P')
+    yield 0.3
 
     # ---------------------------------------------------------------- masks
     brush_before = sculpt.brush.name

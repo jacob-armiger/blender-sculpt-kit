@@ -372,5 +372,17 @@ def test(sim):
               and matcap() == "sculptkit_red_wax.exr" and hasattr(bpy.types, "SCULPTKIT_PT_subtools"),
               (theme.wearing(), matcap()))
 
+    # Switching style must not move the picture: every bar floats over the canvas in both styles
+    heights = []
+    for style in ('KLAY', 'ZBRUSH', 'KLAY'):
+        prefs.look_style = style
+        yield 0.8
+        yield from sim.nudge()
+        heights.append((sim.region().y, sim.region().height))
+    prefs.look_style = 'ZBRUSH'
+    yield 0.5
+    sim.check("switching between the KlaySculpt and ZBrush styles leaves the canvas where it was", len(set(heights)) == 1,
+              heights)
+
 
 simlib.run("sim_zbrush_look", test)
